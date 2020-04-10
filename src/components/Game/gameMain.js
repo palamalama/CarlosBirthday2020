@@ -21,7 +21,10 @@ class Game extends React.Component {
 	}
 
 	draw(){
+		this.drawLines();
 		this.drawPeople();
+	}
+	drawLines(){
 	}
 	drawPeople(){
 		let people = d3.select(this.svg)
@@ -43,13 +46,13 @@ class Game extends React.Component {
 		let transition = people.transition()
 			.duration(100)
 		transition.select("circle")
-			.attr("cx",(d) => (d.x-this.state.me.x)+"%")
-			.attr("cy",(d) => (d.y-this.state.me.y)+"%")
+			.attr("cx",(d) => (d.x-this.state.me.x)+this.centerCoordinates.x)
+			.attr("cy",(d) => (d.y-this.state.me.y)+this.centerCoordinates.y)
 			.attr("stroke-width",(d) => Math.sqrt(d.size*2))
 			.attr("r", (d) => d.size);
 		transition.select("text")
-			.attr("x", (d) => (d.x-this.state.me.x)+"%")
-			.attr("y", (d) => (d.y-this.state.me.y)+"%")
+			.attr("x", (d) => (d.x-this.state.me.x)+this.centerCoordinates.x)
+			.attr("y", (d) => (d.y-this.state.me.y)+this.centerCoordinates.y)
 			.attr("font-size", (d) => Math.sqrt(d.size*2+200));
 		let meData = [];
 		meData.push(this.state.me);
@@ -84,9 +87,7 @@ class Game extends React.Component {
 
 	componentDidMount() {
 		this.socket = openSocket();
-		console.log(this.socket);
 		this.socket.on("setup",(response) => {
-			console.log("Setup called");
 			let people = response.data.people;
 			let me = people[response.new_user_id];
 			me.name = this.props.name;
@@ -113,21 +114,23 @@ class Game extends React.Component {
 		clearInterval(this.updatePositionInterval);
 	}
 	updatePosition(){
+		let rect = this.centerOfScreenElement.getBoundingClientRect();
+		this.centerCoordinates = {x:rect.x,y:rect.y};
 		let newState = this.state;
 		let dx = 0;
 		let dy = 0;
 		if(this.mousePosition){
-			dx = (this.mousePosition.x - this.centerOfScreenElement.getBoundingClientRect().x)/100;
-			dy = (this.mousePosition.y - this.centerOfScreenElement.getBoundingClientRect().y)/100;
+			dx = (this.mousePosition.x - this.centerCoordinates.x);
+			dy = (this.mousePosition.y - this.centerCoordinates.y);
 		}
-		let length = Math.sqrt(dx*dx + dy*dy)-screen.width/40;
-		newState.me.x += dx/Math.min(0.001,length)*Math.min(length,1);	
-		newState.me.y += dy/Math.min(0.001,length)*Math.min(length,1);
+		let length = Math.max(0.001,Math.sqrt(dx*dx + dy*dy)-200);
+		newState.me.x += dx/length*Math.min(length/100,1);	
+		newState.me.y += dy/length*Math.min(length/100,1);
 		this.setState(newState);
 		this.socket.emit("update",this.state.me);
 	}
 	updateMousePosition(e){
-		this.mousePosition = {x:e.screenX,y:e.screenY};
+		this.mousePosition = {x:e.clientX,y:e.clientY};
 	}
 }
 export default Game;
