@@ -7,7 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
-    "server":"node frontend_server.js"
+    "server": "node frontend_server.js"
   },
   "keywords": [],
   "author": "",
@@ -31,6 +31,7 @@
     "react": "^16.9.0",
     "react-dom": "^16.9.0",
     "react-mic": "^12.4.1",
+    "socket.io": "^2.3.0",
     "socket.io-client": "^2.3.0"
   }
 }

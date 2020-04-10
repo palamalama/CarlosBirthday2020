@@ -1,8 +1,22 @@
-const express = require('express')
-const app = express();
+var app = require('express')();
 var http = require('http').createServer(app);
-var io = require('socket.io')(http);
-io.origins('*:*');
+
+app.get('/', function(req, res){
+	console.log("Someone requested the main page");
+	res.sendFile(__dirname + '/index.html');
+});
+
+app.get("/main.js", function(req, res){
+	console.log("Someone requested javascript");
+	res.sendFile(__dirname + "/main.js");
+});
+
+
+
+
+var io = require("socket.io")(http);
+io.origins("*:*");
+
 
 let connection_id = 0;
 let data = {
@@ -26,12 +40,14 @@ io.on("connection",(socket) => {
 	});
 	
 	socket.on("update",(updatedPerson) => {
+		console.log("Update from: -",updatedPerson.id);
 		data.people[updatedPerson.id] = updatedPerson;
 	});
 });
 setInterval(() => {
-	data.people["-1"].x += Math.random()-0.5;
-	data.people["-1"].y += Math.random()-0.5;
+	console.log("Updating data")
+	data.people["-1"].x += Math.random()*2-1;
+	data.people["-1"].y += Math.random()*2-1;
 	io.sockets.emit('update', data);
 }, 50);
 
