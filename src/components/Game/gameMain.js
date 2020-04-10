@@ -6,12 +6,10 @@ class Game extends React.Component {
 	constructor(props){
 		super(props);
 		this.updateMousePosition = this.updateMousePosition.bind(this);
-		this.endpoint = "http://82.23.156.228:21100";
 		this.state = {
 			people:{},
 			me:{}
 		}
-		console.log("Setting state is all good");
 		
 	}
 	render(){
@@ -85,8 +83,10 @@ class Game extends React.Component {
 	}
 
 	componentDidMount() {
-		this.socket = openSocket(this.endpoint);
+		this.socket = openSocket();
+		console.log(this.socket);
 		this.socket.on("setup",(response) => {
+			console.log("Setup called");
 			let people = response.data.people;
 			let me = people[response.new_user_id];
 			me.name = this.props.name;
@@ -117,12 +117,12 @@ class Game extends React.Component {
 		let dx = 0;
 		let dy = 0;
 		if(this.mousePosition){
-			dx = (this.mousePosition.x - screen.width /2)/100;
-			dy = (this.mousePosition.y - screen.height /2)/100;
+			dx = (this.mousePosition.x - this.centerOfScreenElement.getBoundingClientRect().x)/100;
+			dy = (this.mousePosition.y - this.centerOfScreenElement.getBoundingClientRect().y)/100;
 		}
-		let length = Math.sqrt(dx*dx + dy*dy);
-		newState.me.x += dx/(0.001+length)*Math.min(length,1);	
-		newState.me.y += dy/(0.001+length)*Math.min(length,1);
+		let length = Math.sqrt(dx*dx + dy*dy)-screen.width/40;
+		newState.me.x += dx/Math.min(0.001,length)*Math.min(length,1);	
+		newState.me.y += dy/Math.min(0.001,length)*Math.min(length,1);
 		this.setState(newState);
 		this.socket.emit("update",this.state.me);
 	}

@@ -7,7 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
-    "server": "node frontend_server.js"
+    "server": "node server.js"
   },
   "keywords": [],
   "author": "",
