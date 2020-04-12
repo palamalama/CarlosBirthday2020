@@ -5,12 +5,20 @@ class MainCharacter extends React.Component{
 	render(){
 		return (
 			<g ref={(group) => this.group = group}>
-				<circle cx="50%" cy="50%" fill="red" stroke="crimson"/>
+				<circle ref={(circle) => this.circle = circle} cx="50%" cy="50%" fill="red" stroke="crimson"/>
 				<text x="50%" y="50%">
 					{this.props.me.name}
 				</text>	
 			</g>
 		);
+	}
+	setCenterOfScreen(){
+		let rect = this.group.getBoundingClientRect();
+		this.props.setCenterOfScreen({x:rect.x,y:rect.y});
+	}
+	componentDidMount(){
+		this.setCenterOfScreen();
+		window.addEventListener('resize', this.setCenterOfScreen.bind(this));
 	}
 	componentDidUpdate(){
 		let radius= Math.sqrt(this.props.me.size*3);
