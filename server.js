@@ -27,6 +27,7 @@ let data = {
 	}
 };
 io.on("connection",(socket) => {
+	console.log(socket.handshake.address);
 	let id = connection_id ++;
 	let newPerson = {"name":"Gimme a moment","id":id,x:Math.random()*100,y:Math.random()*100,size:10};
 	data.people[id] = newPerson;
@@ -34,7 +35,9 @@ io.on("connection",(socket) => {
 	data.people["-1"].y = 5;
 	socket.emit("setup",{data:data,new_user_id:id});
 	console.log("Connected ",newPerson);
-
+	data.people["-2"] = {"name":"A boy who will break your world","size":30,"id":"breaker0","x":10,"y":10};
+	data.people["-3"] = {"name":"Mc Destroyer","size":50,"id":"breaker0","x":70,"y":100};
+	
 	socket.on('disconnect',() => {
 		delete data.people[id];
 	});
@@ -43,6 +46,7 @@ io.on("connection",(socket) => {
 		console.log("Update from: -",updatedPerson.id);
 		data.people[updatedPerson.id] = updatedPerson;
 	});
+	console.log(data.people);
 });
 setInterval(() => {
 	console.log("Updating data")

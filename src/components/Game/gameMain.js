@@ -27,6 +27,7 @@ class Game extends React.Component {
 	drawLines(){
 	}
 	drawPeople(){
+		console.log(this.state.people);
 		let people = d3.select(this.svg)
 			.selectAll(".people")
 			.data(Object.values(this.state.people));
@@ -53,7 +54,9 @@ class Game extends React.Component {
 		transition.select("text")
 			.attr("x", (d) => (d.x-this.state.me.x)+this.centerCoordinates.x)
 			.attr("y", (d) => (d.y-this.state.me.y)+this.centerCoordinates.y)
+			.text((d) => d.name)
 			.attr("font-size", (d) => Math.sqrt(d.size*2+200));
+
 		let meData = [];
 		meData.push(this.state.me);
 		let me = d3.select(this.svg)
@@ -104,6 +107,7 @@ class Game extends React.Component {
 				people:people
 			});
 		});
+		this.updatePosition();
 		this.updatePositionInterval = setInterval(() => this.updatePosition(), 50);
 		this.draw();
 	}
