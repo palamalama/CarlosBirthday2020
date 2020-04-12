@@ -1,6 +1,7 @@
 import React from "react";
 import * as d3 from "d3";
 import openSocket from 'socket.io-client';
+import Person from "./person";
 
 class Game extends React.Component {
 	constructor(props){
@@ -16,6 +17,12 @@ class Game extends React.Component {
 		return (
 			<svg className="MainSVG" ref={(svg) => this.svg = svg} onMouseMove={this.updateMousePosition} style={{"margin":"0","width":"100%","height":"100%"}}>
 				<circle ref={(center) => this.centerOfScreenElement = center} cx="50%" cy="50%" r="1" />
+				{Object.values(this.state.people).map((person) => (
+					<Person person={person}
+						mainCharacter={this.state.me} 
+						centerCoordinates={this.centerCoordinates||{"x":0,"y":0}}
+					/>
+				))}
 			</svg>
 		);
 	}
@@ -27,36 +34,6 @@ class Game extends React.Component {
 	drawLines(){
 	}
 	drawPeople(){
-		console.log(this.state.people);
-		let people = d3.select(this.svg)
-			.selectAll(".people")
-			.data(Object.values(this.state.people));
-
-		let newGroup = people.enter()
-			.append("g")
-			.attr("class","people");
-		newGroup.append("circle")
-			.attr("stroke","crimson")
-			.attr("fill","red");
-
-		newGroup.append("text")
-			.text((d) => d.name);
-
-		people.exit().remove();
-		
-		let transition = people.transition()
-			.duration(100)
-		transition.select("circle")
-			.attr("cx",(d) => (d.x-this.state.me.x)+this.centerCoordinates.x)
-			.attr("cy",(d) => (d.y-this.state.me.y)+this.centerCoordinates.y)
-			.attr("stroke-width",(d) => Math.sqrt(d.size*2))
-			.attr("r", (d) => d.size);
-		transition.select("text")
-			.attr("x", (d) => (d.x-this.state.me.x)+this.centerCoordinates.x)
-			.attr("y", (d) => (d.y-this.state.me.y)+this.centerCoordinates.y)
-			.text((d) => d.name)
-			.attr("font-size", (d) => Math.sqrt(d.size*2+200));
-
 		let meData = [];
 		meData.push(this.state.me);
 		let me = d3.select(this.svg)
