@@ -2,6 +2,7 @@ import React from "react";
 import * as d3 from "d3";
 import openSocket from 'socket.io-client';
 import Person from "./person";
+import MainCharacter from "./mainCharacter";
 
 class Game extends React.Component {
 	constructor(props){
@@ -9,7 +10,7 @@ class Game extends React.Component {
 		this.updateMousePosition = this.updateMousePosition.bind(this);
 		this.state = {
 			people:{},
-			me:{}
+			me:{"name":props.name,"size":10,"x":0,"y":0}
 		}
 		
 	}
@@ -22,47 +23,11 @@ class Game extends React.Component {
 						mainCharacter={this.state.me} 
 						centerCoordinates={this.centerCoordinates||{"x":0,"y":0}}
 					/>
-				))}
+				))} 
+				<MainCharacter me={this.state.me}/>
+				
 			</svg>
 		);
-	}
-
-	draw(){
-		this.drawLines();
-		this.drawPeople();
-	}
-	drawLines(){
-	}
-	drawPeople(){
-		let meData = [];
-		meData.push(this.state.me);
-		let me = d3.select(this.svg)
-			.selectAll(".me")
-			.data(meData);
-		me.exit().remove();
-		let newMe = me.enter()
-			.append("g")
-			.attr("class","me");
-		newMe.append("circle")
-			.attr("cx","50%")
-			.attr("cy","50%")
-			.attr("stroke","crimson")
-			.attr("fill","red");
-		newMe.append("text")
-			.attr("x","50%")
-			.attr("y","50%")
-			.text((d) => d.name);
-		
-		let transitionMe = me.transition()
-			.duration(100);
-		transitionMe.select("circle")
-			.attr("stroke-width",(d) => Math.sqrt(d.size*2)) 
-			.attr("font-size", (d) => Math.sqrt(d.size*2+200))
-			.attr("r",(d) => d.size);
-		transitionMe.select("text")
-			.text((d) => d.name)
-			.attr("font-size",(d) => Math.sqrt(d.size*2+200));
-			
 	}
 
 	componentDidMount() {
@@ -86,10 +51,6 @@ class Game extends React.Component {
 		});
 		this.updatePosition();
 		this.updatePositionInterval = setInterval(() => this.updatePosition(), 50);
-		this.draw();
-	}
-	componentDidUpdate(){
-		this.draw();
 	}
 	componentWillUnmount() {
 		clearInterval(this.updatePositionInterval);
