@@ -31,8 +31,8 @@ class Game extends React.Component {
 		);
 	}
 
+	socket = openSocket();
 	componentDidMount() {
-		this.socket = openSocket();
 		this.socket.on("setup",(response) => {
 			console.log("SETUP");
 			let people = response.data.people;
@@ -62,6 +62,7 @@ class Game extends React.Component {
 		});
 	}
 	componentWillUnmount() {
+		this.socket.emit("disconnect");
 		clearInterval(this.updatePositionInterval);
 	}
 	setCenterOfScreen(pos){
