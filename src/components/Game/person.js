@@ -10,6 +10,9 @@ class Person extends React.Component {
 				</text>
 			);
 		}
+		else if(this.props.person.state == "deleted"){
+			return (null);
+		}
 		return (
 			<g ref={(person) => this.person = person} className="people">
 				<circle fill="red" stroke="crimson"/>

@@ -22,21 +22,21 @@ let connection_id = 0;
 let data = {
 	people:{
 		"-1":{
-			"name": "A realtime random boy","size":10,"id":"-1","x":5,"y":5
+			"name": "A realtime random boy","size":10,"id":"-1","x":5,"y":5,state:"alive"
 		},
 	}
 };
 io.on("connection",(socket) => {
 	console.log(socket.handshake.address);
 	let id = connection_id ++;
-	let newPerson = {"name":"Gimme a moment","id":id,x:Math.random()*100,y:Math.random()*100,size:10};
+	let newPerson = {"name":id,"id":id,x:Math.random()*100,y:Math.random()*100,size:10,state:"alive"};
 	data.people[id] = newPerson;
 	data.people["-1"].x = 5;
 	data.people["-1"].y = 5;
 	socket.emit("setup",{data:data,new_user_id:id});
 	console.log("Connected ",newPerson);
-	data.people["-2"] = {"name":"A boy who will break your world","size":30,"id":"breaker0","x":10,"y":10};
-	data.people["-3"] = {"name":"Mc Destroyer","size":50,"id":"breaker0","x":70,"y":100};
+	//data.people["-2"] = {"name":"A boy who will break your world","size":30,"id":"-2","x":10,"y":10,state:"alive"};
+	//data.people["-3"] = {"name":"Mc Destroyer","size":50,"id":"-3","x":70,"y":100,state:"alive"};
 	
 	socket.on('disconnect',() => {
 		delete data.people[id];

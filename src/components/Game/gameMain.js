@@ -11,7 +11,7 @@ class Game extends React.Component {
 		this.setCenterOfScreen = this.setCenterOfScreen.bind(this);
 		this.state = {
 			people:{},
-			me:{"name":props.name,"size":10,"x":0,"y":0}
+			me:{"name":"Big baby","size":10,"x":0,"y":0,state:"alive"}
 		}
 		
 	}
@@ -19,13 +19,14 @@ class Game extends React.Component {
 		return (
 			<svg className="MainSVG" ref={(svg) => this.svg = svg} onMouseMove={this.updateMousePosition} style={{"margin":"0","width":"100%","height":"100%"}}>
 				<MainCharacter me={this.state.me} setCenterOfScreen={this.setCenterOfScreen}/>
-				{Object.values(this.state.people).map((person) => (
-					<Person person={person}
-						mainCharacter={this.state.me} 
-						centerCoordinates={this.state.centerOfScreen || {x:0,y:0}}
-					/>
-				))} 
-				
+				{Object.values(this.state.people)
+					.map((person) => (
+						<Person person={person}
+							mainCharacter={this.state.me} 
+							centerCoordinates={this.state.centerOfScreen || {x:0,y:0}}
+						/>
+					))
+				}
 			</svg>
 		);
 	}
@@ -35,7 +36,7 @@ class Game extends React.Component {
 		this.socket.on("setup",(response) => {
 			let people = response.data.people;
 			let me = people[response.new_user_id];
-			me.name = this.props.name;
+			//me.name = this.props.name;
 			delete people[response.new_user_id];
 			this.setState({
 				people:people,
@@ -43,10 +44,17 @@ class Game extends React.Component {
 			});
 		});
 		this.socket.on("update",(data) => {
-			let people = data.people;
-			delete people[this.state.me.id];
+			let newPeople = data.people;
+			let oldPeople = this.state.people;
+			delete newPeople[this.state.me.id];
+			let peopleStillOnTheMap = Object.keys(newPeople);
+			Object.keys(oldPeople).forEach((personId) => {
+				if(!peopleStillOnTheMap.includes(personId)){
+					newPeople[personId] = {"state":"deleted"};
+				}
+			});
 			this.setState({
-				people:people
+				people:newPeople
 			});
 		});
 		this.updatePositionInterval = setInterval(() => this.updatePosition(), 50);
