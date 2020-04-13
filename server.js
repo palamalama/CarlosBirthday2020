@@ -55,6 +55,9 @@ setInterval(() => {
 	io.sockets.emit('update', data);
 }, 50);
 
+setInterval(() => {
+	console.log(data);
+}, 10000);
 http.listen(2100, () => {
 	console.log('Listening on port 2100!')
 });

@@ -34,6 +34,7 @@ class Game extends React.Component {
 	componentDidMount() {
 		this.socket = openSocket();
 		this.socket.on("setup",(response) => {
+			console.log("SETUP");
 			let people = response.data.people;
 			let me = people[response.new_user_id];
 			//me.name = this.props.name;
@@ -42,8 +43,10 @@ class Game extends React.Component {
 				people:people,
 				me:me
 			});
+			this.updatePositionInterval = setInterval(() => this.updatePosition(), 50);
 		});
 		this.socket.on("update",(data) => {
+			console.log("UPDATE");
 			let newPeople = data.people;
 			let oldPeople = this.state.people;
 			delete newPeople[this.state.me.id];
@@ -57,7 +60,6 @@ class Game extends React.Component {
 				people:newPeople
 			});
 		});
-		this.updatePositionInterval = setInterval(() => this.updatePosition(), 50);
 	}
 	componentWillUnmount() {
 		clearInterval(this.updatePositionInterval);
@@ -71,6 +73,7 @@ class Game extends React.Component {
 		this.mousePosition = {x:e.clientX,y:e.clientY};
 	}
 	updatePosition(){
+		console.log("SENT UPDATE");
 		let newState = this.state;
 		let dx = 0;
 		let dy = 0;
