@@ -12,10 +12,10 @@ class App extends React.Component {
 	}
 
 	render() {
-		if(this.state.name != undefined || true){
+		if(this.state.name != undefined){
 			return (
 				<div className="app" style={{"width":"100%","height":"100%"}}>
-					<Game name={this.state.name || "Anonymous Alpaca"} mapSize={{x:100,y:100}} />
+					<Game name={this.state.name} mapSize={{x:100,y:100}} />
 				</div>
 			);
 		}

@@ -1,18 +1,11 @@
-var app = require('express')();
+var express = require('express');
+var app = express();
 var http = require('http').createServer(app);
+app.use(express.static('public'))
 
 app.get('/', function(req, res){
-	console.log("Someone requested the main page");
 	res.sendFile(__dirname + '/index.html');
 });
-
-app.get("/main.js", function(req, res){
-	console.log("Someone requested javascript");
-	res.sendFile(__dirname + "/main.js");
-});
-
-
-
 
 var io = require("socket.io")(http);
 io.origins("*:*");
@@ -27,37 +20,28 @@ let data = {
 	}
 };
 io.on("connection",(socket) => {
-	console.log(socket.handshake.address);
 	let id = connection_id ++;
 	let newPerson = {"name":id,"id":id,x:Math.random()*100,y:Math.random()*100,size:10,state:"alive"};
 	data.people[id] = newPerson;
 	data.people["-1"].x = 5;
 	data.people["-1"].y = 5;
 	socket.emit("setup",{data:data,new_user_id:id});
-	console.log("Connected ",newPerson);
-	//data.people["-2"] = {"name":"A boy who will break your world","size":30,"id":"-2","x":10,"y":10,state:"alive"};
-	//data.people["-3"] = {"name":"Mc Destroyer","size":50,"id":"-3","x":70,"y":100,state:"alive"};
+	console.log("Connected ",socket.handshake.address, newPerson);
 	
 	socket.on('disconnect',() => {
 		delete data.people[id];
 	});
 	
 	socket.on("update",(updatedPerson) => {
-		console.log("Update from: -",updatedPerson.id);
 		data.people[updatedPerson.id] = updatedPerson;
 	});
-	console.log(data.people);
 });
 setInterval(() => {
-	console.log("Updating data")
 	data.people["-1"].x += Math.random()*2-1;
 	data.people["-1"].y += Math.random()*2-1;
 	io.sockets.emit('update', data);
 }, 50);
 
-setInterval(() => {
-	console.log(data);
-}, 10000);
 http.listen(2100, () => {
 	console.log('Listening on port 2100!')
 });

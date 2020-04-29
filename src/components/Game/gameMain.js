@@ -37,7 +37,7 @@ class Game extends React.Component {
 			console.log("SETUP");
 			let people = response.data.people;
 			let me = people[response.new_user_id];
-			//me.name = this.props.name;
+			me.name = this.props.name;
 			delete people[response.new_user_id];
 			this.setState({
 				people:people,
