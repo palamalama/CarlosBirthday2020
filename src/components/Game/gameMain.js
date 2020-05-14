@@ -17,24 +17,35 @@ class Game extends React.Component {
 	}
 	render(){
 		return (
-			<svg className="MainSVG" ref={(svg) => this.svg = svg} onMouseMove={this.updateMousePosition} style={{"margin":"0","width":"100%","height":"100%"}}>
-				<MainCharacter me={this.state.me} setCenterOfScreen={this.setCenterOfScreen}/>
-				{Object.values(this.state.people)
-					.map((person) => (
-						<Person person={person}
-							mainCharacter={this.state.me} 
-							centerCoordinates={this.state.centerOfScreen || {x:0,y:0}}
-						/>
-					))
-				}
-			</svg>
+			<div style={{"margin":"0","width":"100%","height":"100%"}}>
+				<svg className="MainSVG" ref={(svg) => this.svg = svg} onMouseMove={this.updateMousePosition} style={{"margin":"0","width":"100%","height":"100%"}}>
+					<MainCharacter me={this.state.me} setCenterOfScreen={this.setCenterOfScreen}/>
+					{Object.values(this.state.people)
+						.map((person) => (
+							<Person person={person}
+								mainCharacter={this.state.me} 
+								centerCoordinates={this.state.centerOfScreen || {x:0,y:0}}
+							/>
+						))
+					}
+				</svg>
+			</div>
 		);
 	}
 
-	socket = openSocket();
 	componentDidMount() {
+		this.setupAudio();
+		this.setupSocket();
+	}
+	componentDidUpdate(){
+	}	
+	setupAudio(){
+	}
+	teardownAudio(){
+	}
+	setupSocket(){
+		this.socket = openSocket();
 		this.socket.on("setup",(response) => {
-			console.log("SETUP");
 			let people = response.data.people;
 			let me = people[response.new_user_id];
 			me.name = this.props.name;
@@ -43,10 +54,9 @@ class Game extends React.Component {
 				people:people,
 				me:me
 			});
-			this.updatePositionInterval = setInterval(() => this.updatePosition(), 50);
+			this.updatePositionInterval = setInterval(() => this.updatePosition(), 100);
 		});
 		this.socket.on("update",(data) => {
-			console.log("UPDATE");
 			let newPeople = data.people;
 			let oldPeople = this.state.people;
 			delete newPeople[this.state.me.id];
@@ -61,9 +71,13 @@ class Game extends React.Component {
 			});
 		});
 	}
-	componentWillUnmount() {
+	teardownSocket(){
 		this.socket.emit("disconnect");
 		clearInterval(this.updatePositionInterval);
+	}
+	componentWillUnmount() {
+		teardownAudio();
+		teardownSocket();
 	}
 	setCenterOfScreen(pos){
 		this.setState({
@@ -74,7 +88,6 @@ class Game extends React.Component {
 		this.mousePosition = {x:e.clientX,y:e.clientY};
 	}
 	updatePosition(){
-		console.log("SENT UPDATE");
 		let newState = this.state;
 		let dx = 0;
 		let dy = 0;
@@ -88,5 +101,6 @@ class Game extends React.Component {
 		this.setState(newState);
 		this.socket.emit("update",this.state.me);
 	}
+
 }
 export default Game;

@@ -1,13 +1,23 @@
+var fs = require("fs");
 var express = require('express');
 var app = express();
-var http = require('http').createServer(app);
+
+var privateKey  = fs.readFileSync('sslcert/express-selfsigned.key', 'utf8');
+var certificate = fs.readFileSync('sslcert/express-selfsigned.crt', 'utf8');
+var credentials = {key: privateKey, cert: certificate};
+
+var https = require("https").createServer(credentials,app);
 app.use(express.static('public'))
 
 app.get('/', function(req, res){
 	res.sendFile(__dirname + '/index.html');
 });
 
-var io = require("socket.io")(http);
+https.listen(2100, () => {
+	console.log('Listening on port 2100!')
+});
+
+var io = require("socket.io")(https);
 io.origins("*:*");
 
 
@@ -42,6 +52,3 @@ setInterval(() => {
 	io.sockets.emit('update', data);
 }, 50);
 
-http.listen(2100, () => {
-	console.log('Listening on port 2100!')
-});

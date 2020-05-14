@@ -2,7 +2,7 @@
 //
 var counter=0;
 
-class AudenceProcessor extends AudioWorkletProcessor {
+class AudenceProcessor extends window.AudioWorkletProcessor {
 	static get parameterDescriptors() {
 	      return [{
 	            name: 'size',

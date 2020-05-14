@@ -7,8 +7,7 @@ class App extends React.Component {
 	constructor(props){
 		super(props);
 		this.login = this.login.bind(this);
-		this.state = {
-		};
+		this.state = {};
 	}
 
 	render() {
@@ -19,19 +18,15 @@ class App extends React.Component {
 				</div>
 			);
 		}
-		else{
-			return (
-				<div className="app" style={{"width":"100%","height":"100%"}}>
-					<Login login={this.login}/>
-				</div>
-			);
-		}
+		return (
+			<div className="app" style={{"width":"100%","height":"100%"}}>
+				<Login login={this.login}/>
+			</div>
+		);
 	}
 	login(name){
 		console.log("You just Logged In!",name);
-		this.setState({
-			name:name||"Anonymous Alpaca"
-		});	
+		this.setState({name:name||"Anonymous Alpaca"});	
 	}
 }
 
