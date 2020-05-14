@@ -3,6 +3,7 @@ import * as d3 from "d3";
 import openSocket from 'socket.io-client';
 import Person from "./person";
 import MainCharacter from "./mainCharacter";
+import { recordAudio, playAudio } from "./Audio/AudioHandler";
 
 class Game extends React.Component {
 	constructor(props){
@@ -34,12 +35,24 @@ class Game extends React.Component {
 	}
 
 	componentDidMount() {
-		this.setupAudio();
 		this.setupSocket();
+		this.setupAudio();
 	}
 	componentDidUpdate(){
 	}	
 	setupAudio(){
+		recordAudio(this.audioReceived.bind(this));//get audio permission from user with callback to send audio to
+		this.socket.on("audioFromServer",(data) => {
+			playAudio(data);
+		});
+	}
+	audioReceived(audio){
+		console.log("Audio has been recieved! ", audio);
+		this.socket.emit("audioFromClient",{
+			"audio": audio,
+			"sequence": packetSequence,
+			"timeEmitted": now
+		});
 	}
 	teardownAudio(){
 	}

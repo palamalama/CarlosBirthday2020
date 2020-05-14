@@ -1,13 +1,3 @@
-// UI behaviour setup
-// 
-$(document).ready(function () {
-	$("#startBtn").click(function () {
-		$(this).hide();
-		startTalking();
-	});
-});
-
-
 //Global variables
 //
 const SampleRate = 16000; 		// Global sample rate used for all audio
@@ -55,7 +45,7 @@ var currentSeq = 0;			// Last packet sequence received
 var seqGap = 0;				// Accumulators for round trip measurements
 var timeGap = 0;
 var seqStep = 0;
-const updateTimer = 10000;
+/*const updateTimer = 10000;
 function printReport() {
 	console.log("Idle = ", idleState.total, " data in = ", dataInState.total, " audio in/out = ", audioInOutState.total);
 	console.log("Sent = ",packetsOut," Heard = ",packetsIn," speaker buffer size ",spkrBuffer.length," mic buffer size ", micBuffer.length," overflows = ",overflows," shortages = ",shortages);
@@ -66,11 +56,12 @@ function printReport() {
 	timeGap = 0;
 }
 setInterval(printReport, updateTimer);
-
+*/
 
 
 // Network code
 //
+/*
 var socketIO = io();
 socketIO.on('connect', function (socket) {
 	console.log('socket connected!');
@@ -109,12 +100,43 @@ socketIO.on('connect', function (socket) {
 		enterState( idleState );
 	});
 });
-
+*/
+export function playAudio(audio){
+	enterState( dataInState );
+	packetsIn++;
+	let d = new Date();
+	let now = d.getTime();
+	if (micAccessAllowed) {	// Need access to audio before outputing
+		let mix = [];	// Build up a mix of client audio 
+		let clients = data.c; 
+		for (let c=0; c < clients.length; c++) {
+			if (clients[c].clientID != socketIO.id) {
+				let a = clients[c].packet.audio;
+				timeGap += now - clients[c].packet.timeEmitted;
+				if (mix.length == 0)
+					for (let i=0; i < a.length; i++)
+						mix[i] = a[i];
+				else
+					for (let i=0; i < a.length; i++)
+						mix[i] += a[i];
+			}
+		}
+		if (mix.length != 0) {
+			for (let i in mix) spkrBuffer.push(mix[i]);
+			if (spkrBuffer.length > maxBuffSize) {
+				spkrBuffer.splice(0, (spkrBuffer.length-maxBuffSize)); 	
+				overflows++;
+			}
+		}
+	}
+	enterState( idleState );
+}
+/*
 socketIO.on('disconnect', function () {
 	console.log('socket disconnected!');
 	socketConnected = false;
 });
-
+*/
 
 
 // Need function to receive UI position updates in order to rebuild audio mix table
@@ -128,7 +150,7 @@ function hasGetUserMedia() {		// Test for browser capability
 		navigator.mozGetUserMedia || navigator.msGetUserMedia);
 }
 
-function startTalking() {
+export function recordAudio(callback) {
 	if (hasGetUserMedia()) {
 		var context = new window.AudioContext || new window.webkitAudioContext;
 		soundcardSampleRate = context.sampleRate;
@@ -142,6 +164,7 @@ function startTalking() {
 		navigator.getUserMedia({ audio: constraints }, function (stream) {
 			micAccessAllowed = true;
 			var liveSource = context.createMediaStreamSource(stream);
+			let node = undefined;
 			if (!context.createScriptProcessor) {
 				node = context.createJavaScriptNode(chunkSize, 1, 1);
 			} else {
@@ -152,7 +175,7 @@ function startTalking() {
 				var inData = e.inputBuffer.getChannelData(0);
 				var outData = e.outputBuffer.getChannelData(0);
 				let audio = [];
-				if (socketConnected) {		// Mic audio can be sent to server
+				if (true) {		// Mic audio can be sent to server
 					audio = downSample(inData, soundcardSampleRate, SampleRate);
 					resampledChunkSize = audio.length;
 					for (let i in audio) micBuffer.push(audio[i]);
@@ -160,12 +183,19 @@ function startTalking() {
 						audio = micBuffer.splice(0, PacketSize);
 						let d = new Date();
 						let now = d.getTime();
+						callback({
+							"audio": audio,
+							"sequence": packetSequence,
+							"timeEmitted": now
+						});
+						/*
 						socketIO.emit("u",
 						{
 							"audio": audio,
 							"sequence": packetSequence,
 							"timeEmitted": now
 						});
+						*/
 						packetsOut++;
 						packetSequence++;
 					}
