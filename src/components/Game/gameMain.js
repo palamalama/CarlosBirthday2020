@@ -3,7 +3,9 @@ import * as d3 from "d3";
 import openSocket from 'socket.io-client';
 import Person from "./person";
 import MainCharacter from "./mainCharacter";
-import { recordAudio, playAudio } from "./Audio/AudioHandler";
+import AudioHandler from "./Audio/AudioHandler";
+
+var packetSequence = 0; 
 
 class Game extends React.Component {
 	constructor(props){
@@ -41,23 +43,20 @@ class Game extends React.Component {
 	componentDidUpdate(){
 	}	
 	setupAudio(){
-		recordAudio(this.audioReceived.bind(this));//get audio permission from user with callback to send audio to
-		this.socket.on("audioFromServer",(data) => {
-			playAudio(data);
-		});
+		this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
 	}
-	audioReceived(audio){
-		console.log("Audio has been recieved! ", audio);
-		this.socket.emit("audioFromClient",{
+	audioRecorded(audio){
+		this.socket.emit("u",{
 			"audio": audio,
 			"sequence": packetSequence,
-			"timeEmitted": now
+			"timeEmitted": new Date().getTime()
 		});
 	}
 	teardownAudio(){
 	}
 	setupSocket(){
-		this.socket = openSocket();
+		this.socket = openSocket();	
+		this.audioHandler = new AudioHandler(this.socket.id);
 		this.socket.on("setup",(response) => {
 			let people = response.data.people;
 			let me = people[response.new_user_id];
@@ -83,6 +82,11 @@ class Game extends React.Component {
 				people:newPeople
 			});
 		});
+		this.socket.on("d",(data) => {
+			//console.log("Recieved Audio!!", data);
+			this.audioHandler.playAudio(data);
+		});
+		this.socket.emit("upstreamHi");
 	}
 	teardownSocket(){
 		this.socket.emit("disconnect");

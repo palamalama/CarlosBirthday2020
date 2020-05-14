@@ -1,3 +1,10 @@
+//
+// Launch parameters are -u upstream_server -d downstream server
+// Multiple donstream servers can be specified but only one upstream is possible
+//
+
+// Globals and constants
+//
 function ClientBuffer() { 	// Object to buffer audio from a specific client
 	this.clientID = 0;	// ID of the socket in the client and server
 	this.packets = [];	// buffer of audio packets
@@ -71,8 +78,8 @@ if (PORT == undefined) {		// Not running on heroku so use SSL
 	var https = require('https');
 	var SSLPORT = 443; //Default 443
 	var HTTPPORT = 80; //Default 80 (Only used to redirect to SSL port)
-	var privateKeyPath = "sslcert/express-selfsigned.key";
-	var certificatePath = "sslcert/express-selfsigned.crt";
+	var privateKeyPath = "./cert/key.pem"; //Default "./cert/key.pem"
+	var certificatePath = "./cert/cert.pem"; //Default "./cert/cert.pem"
 	var privateKey = fs.readFileSync( privateKeyPath );
 	var certificate = fs.readFileSync( certificatePath );
 	var server = https.createServer({
@@ -102,33 +109,9 @@ function createClientBuffer(client) {
 	return buffer;
 }
 
-let connection_id = 0;
-let data = {
-	people:{
-		"-1":{
-			"name": "A realtime random boy","size":10,"id":"-1","x":5,"y":5,state:"alive"
-		},
-	}
-};
-
 
 // socket event and audio handling area
 io.sockets.on('connection', function (socket) {
-	//ERIC STUFF
-	let id = connection_id ++;
-	let newPerson = {"name":id,"id":id,x:Math.random()*100,y:Math.random()*100,size:10,state:"alive"};
-	data.people[id] = newPerson;
-	data.people["-1"].x = 5;
-	data.people["-1"].y = 5;
-	socket.emit("setup",{data:data,new_user_id:id});
-	console.log("Connected ",socket.handshake.address, newPerson);
-	
-	
-	socket.on("update",(updatedPerson) => {
-		data.people[updatedPerson.id] = updatedPerson;
-	});
-
-	//ERIC STUFF
 	console.log("New connection:", socket.id);
 	clientsLive++;
 
@@ -137,8 +120,6 @@ io.sockets.on('connection', function (socket) {
 		console.log("Idle = ", idleState.total, " upstream = ", upstreamState.total, " downstream = ", downstreamState.total, " genMix = ", genMixState.total);
 		// No need to remove the client's buffer as it will happen automatically
 		clientsLive--;
-
-		delete data.people[id];
 	});
 
 	socket.on('downstreamHi', function (data) {
@@ -198,12 +179,6 @@ io.sockets.on('connection', function (socket) {
 	});
 });
 
-
-setInterval(() => {
-	data.people["-1"].x += Math.random()*2-1;
-	data.people["-1"].y += Math.random()*2-1;
-	io.sockets.emit('update', data);
-}, 50);
 
 // Audio management, marshalling and manipulation code
 //
@@ -278,11 +253,37 @@ function generateMix () {
 					shortages++;
 				}
 				else {
+//					for (let i = 0; i < newTrack.audio.length; ++i) 
+//						mix[i] = (mix[i] + newTrack.audio[i]);	
 					clientPackets.push( newTrack );		// Store packet of source audio 
 				}
 			}
 			client--;						// next client down in buffer
 		}
+//		gain = applyAutoGain(mix, gain); 	// Apply auto gain to mix starting at the current gain level 
+//		let finalMix = [];			// Final audio mix with upstream audio to send downstream
+//		if (upstreamServer != null) { 		// We have an upstream server. Send it audio
+//			if ((upstreamBuffer.length >= mixTriggerLevel) || (oldUpstreamBuffer.length > 0 )) { 
+//				let upstreamAudio = [];				// Piece of upstream audio to mix in
+//				if (upstreamBuffer == []) { 			// if no upstream audio
+//					upstreamAudio = oldUpstreamBuffer;	// Use old buffer
+//				} else {
+//					upstreamAudio = upstreamBuffer.shift();	// Get new packet from buffer
+//					oldUpstreamBuffer = upstreamAudio;	// and store it in old buffer
+//				}
+//				for (let i = 0; i < upstreamAudio.length; ++i) 
+//					finalMix[i] = mix[i] + upstreamAudio[i];
+//				upstreamGain = applyAutoGain(finalMix, upstreamGain); // Apply auto gain to final mix 
+//			}
+//		}
+//		if (finalMix.length > 0) {	// Send final mix and source audio tracks to all downstream clients
+//			upstreamServer.volatile.emit("u", mix); // THIS MAY NOT WORK... try io.sockets.socket(upstreamServer).emit
+//			io.sockets.in('downstream').volatile.emit('d', {
+//					"a": finalMix,
+//					"c": clientAudio,
+//					"g": (gain * upstreamGain) });
+//		} else { 				// Send mix with no upstream audio to all downstream clients
+	
 		if (clientPackets.length != 0) {		// Only send audio if we have some to send
 			packetClassifier[clientPackets.length] = packetClassifier[clientPackets.length] + 1;
 			io.sockets.in('downstream').emit('d', {

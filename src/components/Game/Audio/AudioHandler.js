@@ -1,274 +1,217 @@
-//Global variables
-//
-const SampleRate = 16000; 		// Global sample rate used for all audio
-const PacketSize = 500;			// Server packet size we must conform to
-var chunkSize = 1024;			// Audio chunk size. Fixed by js script processor
-var soundcardSampleRate = null; 	// Get this from context 
-var resampledChunkSize = 0;		// Once resampled the chunks are this size
-var socketConnected = false; 		// True when socket is up
-var micAccessAllowed = false; 		// Need to get user permission
-var spkrBuffer = []; 			// Audio buffer going to speaker
-var maxBuffSize = 5000;			// Max audio buffer chunks for playback
-var micBuffer = [];			// Buffer mic audio before sending
+export class AudioHandler {
+	constructor(socketId){
+		//Global variables
+		//
+		this.SampleRate = 16000; 		// Global sample rate used for all audio
+		this.PacketSize = 500;			// Server packet size we must conform to
+		this.chunkSize = 1024;			// Audio chunk size. Fixed by js script processor
+		this.soundcardSampleRate = null; 	// Get this from context 
+		this.resampledChunkSize = 0;		// Once resampled the chunks are this size
+		this.socketConnected = false; 		// True when socket is up
+		this.micAccessAllowed = false; 		// Need to get user permission
+		this.spkrBuffer = []; 			// Audio buffer going to speaker
+		this.maxBuffSize = 5000;			// Max audio buffer chunks for playback
+		this.micBuffer = [];			// Buffer mic audio before sending
 
-// Timing counters
-//
-// We use these to measure how many miliseconds we spend working on events
-// and how much time we spend doing "nothing" (supposedly idle)
-function stateTimer() {
-	this.name = "";
-	this.total = 0;
-	this.start = 0;
-}
-var idleState = new stateTimer(); 	idleState.name = "Idle";
-var dataInState = new stateTimer();	dataInState.name = "Data In";
-var audioInOutState = new stateTimer();	audioInOutState.name = "Audio In/Out";
-let d = new Date();			// Set the state at start to Idle
-let t = d.getTime();			// and manually set start time
-var currentState = idleState;		currentState.start = t;
-function enterState( newState ) {
-	let d = new Date();
-	let now = d.getTime();
-	currentState.total += now - currentState.start;
-	newState.start = now;
-	currentState = newState;
-}
+		// Timing counters
+		//
+		// We use these to measure how many miliseconds we spend working on events
+		// and how much time we spend doing "nothing" (supposedly idle)
+		this.idleState = this.stateTimer(); 		this.idleState.name = "Idle";
+		this.dataInState = this.stateTimer();		this.dataInState.name = "Data In";
+		this.audioInOutState = this.stateTimer();	this.audioInOutState.name = "Audio In/Out";
+		this.currentState = this.idleState;			this.currentState.start = new Date().getTime();
 
-// Reporting code. Accumulators, interval timer and report generator
-//
-var packetsIn = 0;
-var packetsOut = 0;
-var overflows = 0;
-var shortages = 0;
-var packetSequence = 0;			// Tracing packet ordering
-var currentSeq = 0;			// Last packet sequence received
-var seqGap = 0;				// Accumulators for round trip measurements
-var timeGap = 0;
-var seqStep = 0;
-/*const updateTimer = 10000;
-function printReport() {
-	console.log("Idle = ", idleState.total, " data in = ", dataInState.total, " audio in/out = ", audioInOutState.total);
-	console.log("Sent = ",packetsOut," Heard = ",packetsIn," speaker buffer size ",spkrBuffer.length," mic buffer size ", micBuffer.length," overflows = ",overflows," shortages = ",shortages);
-	packetsIn = 0;
-	packetsOut = 0;
-	overflows = 0;
-	shortages = 0;
-	timeGap = 0;
-}
-setInterval(printReport, updateTimer);
-*/
+		// Reporting code. Accumulators, interval timer and report generator
+		//
+		this.packetsIn = 0;
+		this.packetsOut = 0;
+		this.overflows = 0;
+		this.shortages = 0;
+		this.packetSequence = 0;			// Tracing packet ordering
+		this.currentSeq = 0;			// Last packet sequence received
+		this.seqGap = 0;				// Accumulators for round trip measurements
+		this.timeGap = 0;
+		this.seqStep = 0;
 
+		this.downCache = [0.0,0.0];
+		this.upCache = [0.0,0.0];
+		
+		this.socketId = socketId;
+		setInterval(this.printReport.bind(this), 1000);
+	}
+	printReport() {
+		console.log("Idle = ", this.idleState.total, " data in = ", this.dataInState.total, " audio in/out = ", this.audioInOutState.total);
+		console.log("Sent = ",this.packetsOut," Heard = ",this.packetsIn," speaker buffer size ",this.spkrBuffer.length," mic buffer size ", this.micBuffer.length," overflows = ",this.overflows," shortages = ",this.shortages);
+		this.packetsIn = 0;
+		this.packetsOut = 0;
+		this.overflows = 0;
+		this.shortages = 0;
+		this.timeGap = 0;
+	}
 
-// Network code
-//
-/*
-var socketIO = io();
-socketIO.on('connect', function (socket) {
-	console.log('socket connected!');
-	socketConnected = true;
-	socketIO.emit("upstreamHi"); 	// Say hi to the server - we consider it upstream 
-
-	// Data coming down from upstream server: Group mix plus separate member audios
-	socketIO.on('d', function (data) { 
-		enterState( dataInState );
-		packetsIn++;
-		let d = new Date();
-		let now = d.getTime();
-		if (micAccessAllowed) {	// Need access to audio before outputing
+	stateTimer() {
+		return {
+			name:"",
+			total:0,
+			start:0
+		}
+	}
+	enterState( newState ) {
+		let now = new Date().getTime();
+		this.currentState.total += now - this.currentState.start;
+		newState.start = now;
+		this.currentState = newState;
+	}
+	playAudio(data){
+		this.enterState( this.dataInState );
+		this.packetsIn++;
+		let now = new Date().getTime();
+		if (this.micAccessAllowed) {	// Need access to audio before outputing
 			let mix = [];	// Build up a mix of client audio 
 			let clients = data.c; 
 			for (let c=0; c < clients.length; c++) {
-				if (clients[c].clientID != socketIO.id) {
+				if (clients[c].clientID != this.socketId) {
 					let a = clients[c].packet.audio;
-					timeGap += now - clients[c].packet.timeEmitted;
+					this.timeGap += now - clients[c].packet.timeEmitted;
 					if (mix.length == 0)
 						for (let i=0; i < a.length; i++)
 							mix[i] = a[i];
-	  				else
-		  				for (let i=0; i < a.length; i++)
+					else
+						for (let i=0; i < a.length; i++)
 							mix[i] += a[i];
 				}
 			}
 			if (mix.length != 0) {
-				for (let i in mix) spkrBuffer.push(mix[i]);
-				if (spkrBuffer.length > maxBuffSize) {
-					spkrBuffer.splice(0, (spkrBuffer.length-maxBuffSize)); 	
-					overflows++;
+				for (let i in mix) this.spkrBuffer.push(mix[i]);
+				if (this.spkrBuffer.length > this.maxBuffSize) {
+					this.spkrBuffer.splice(0, (this.spkrBuffer.length-this.maxBuffSize)); 	
+					this.overflows++;
 				}
 			}
 		}
-		enterState( idleState );
-	});
-});
-*/
-export function playAudio(audio){
-	enterState( dataInState );
-	packetsIn++;
-	let d = new Date();
-	let now = d.getTime();
-	if (micAccessAllowed) {	// Need access to audio before outputing
-		let mix = [];	// Build up a mix of client audio 
-		let clients = data.c; 
-		for (let c=0; c < clients.length; c++) {
-			if (clients[c].clientID != socketIO.id) {
-				let a = clients[c].packet.audio;
-				timeGap += now - clients[c].packet.timeEmitted;
-				if (mix.length == 0)
-					for (let i=0; i < a.length; i++)
-						mix[i] = a[i];
-				else
-					for (let i=0; i < a.length; i++)
-						mix[i] += a[i];
-			}
-		}
-		if (mix.length != 0) {
-			for (let i in mix) spkrBuffer.push(mix[i]);
-			if (spkrBuffer.length > maxBuffSize) {
-				spkrBuffer.splice(0, (spkrBuffer.length-maxBuffSize)); 	
-				overflows++;
-			}
-		}
+		this.enterState( this.idleState );
 	}
-	enterState( idleState );
-}
-/*
-socketIO.on('disconnect', function () {
-	console.log('socket disconnected!');
-	socketConnected = false;
-});
-*/
+
+	// Need function to receive UI position updates in order to rebuild audio mix table
+	// and to send the new UI position out to the other clients
 
 
-// Need function to receive UI position updates in order to rebuild audio mix table
-// and to send the new UI position out to the other clients
+	// Media management code (audio in and out)
+	//
+	hasGetUserMedia() {		// Test for browser capability
+		return !!(navigator.getUserMedia || navigator.webkitGetUserMedia ||
+			navigator.mozGetUserMedia || navigator.msGetUserMedia);
+	}
 
-
-// Media management code (audio in and out)
-//
-function hasGetUserMedia() {		// Test for browser capability
-	return !!(navigator.getUserMedia || navigator.webkitGetUserMedia ||
-		navigator.mozGetUserMedia || navigator.msGetUserMedia);
-}
-
-export function recordAudio(callback) {
-	if (hasGetUserMedia()) {
-		var context = new window.AudioContext || new window.webkitAudioContext;
-		soundcardSampleRate = context.sampleRate;
-		let constraints = { mandatory: {
-		      			googEchoCancellation: false,
-		      			googAutoGainControl: false,
-		      			googNoiseSuppression: false,
-		      			googHighpassFilter: false
-		    		}, optional: [] };
-		navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
-		navigator.getUserMedia({ audio: constraints }, function (stream) {
-			micAccessAllowed = true;
-			var liveSource = context.createMediaStreamSource(stream);
-			let node = undefined;
-			if (!context.createScriptProcessor) {
-				node = context.createJavaScriptNode(chunkSize, 1, 1);
-			} else {
-				node = context.createScriptProcessor(chunkSize, 1, 1);
-			}
-			node.onaudioprocess = function (e) {
-				enterState( audioInOutState );
-				var inData = e.inputBuffer.getChannelData(0);
-				var outData = e.outputBuffer.getChannelData(0);
-				let audio = [];
-				if (true) {		// Mic audio can be sent to server
-					audio = downSample(inData, soundcardSampleRate, SampleRate);
-					resampledChunkSize = audio.length;
-					for (let i in audio) micBuffer.push(audio[i]);
-					if (micBuffer.length > PacketSize) {
-						audio = micBuffer.splice(0, PacketSize);
-						let d = new Date();
-						let now = d.getTime();
-						callback({
-							"audio": audio,
-							"sequence": packetSequence,
-							"timeEmitted": now
-						});
-						/*
-						socketIO.emit("u",
-						{
-							"audio": audio,
-							"sequence": packetSequence,
-							"timeEmitted": now
-						});
-						*/
-						packetsOut++;
-						packetSequence++;
+	recordAudio(callback) {
+		if (this.hasGetUserMedia()) {
+			let context = new window.AudioContext || new window.webkitAudioContext;
+			this.soundcardSampleRate = context.sampleRate;
+			let constraints = { mandatory: {
+						googEchoCancellation: false,
+						googAutoGainControl: false,
+						googNoiseSuppression: false,
+						googHighpassFilter: false
+					}, optional: [] };
+			navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+			navigator.getUserMedia({ audio: constraints },(stream) => {
+				this.micAccessAllowed = true;
+				let liveSource = context.createMediaStreamSource(stream);
+				let node = undefined;
+				if (!context.createScriptProcessor) {
+					node = context.createJavaScriptNode(this.chunkSize, 1, 1);
+				} else {
+					node = context.createScriptProcessor(this.chunkSize, 1, 1);
+				}
+				node.onaudioprocess = (e) => {
+					this.enterState( this.audioInOutState );
+					let inData = e.inputBuffer.getChannelData(0);
+					let outData = e.outputBuffer.getChannelData(0);
+					let audio = [];
+					if (true) {		// Mic audio can be sent to server
+						audio = this.downSample(inData, this.soundcardSampleRate, this.SampleRate);
+						this.resampledChunkSize = audio.length;
+						for (let i in audio) this.micBuffer.push(audio[i]);
+						if (this.micBuffer.length > this.PacketSize) {
+							audio = this.micBuffer.splice(0, this.PacketSize);
+							callback({
+								"audio": audio,
+								"sequence": this.packetSequence,
+								"timeEmitted": new Date().getTime()
+							});
+							this.packetsOut++;
+							this.packetSequence++;
+						}
 					}
+					if (this.spkrBuffer.length > this.resampledChunkSize) 
+						audio = this.spkrBuffer.splice(0,this.resampledChunkSize);
+					else {	
+						audio.fill(0,0,(this.resampledChunkSize-1));
+						this.shortages++;
+					}
+					audio = this.upSample(audio, this.SampleRate, this.soundcardSampleRate);
+					for (let i in audio) 
+						outData[i] = audio[i];
+					this.enterState( this.idleState );
 				}
-				if (spkrBuffer.length > resampledChunkSize) 
-					audio = spkrBuffer.splice(0,resampledChunkSize);
-				else {	
-					audio.fill(0,0,(resampledChunkSize-1));
-					shortages++;
-				}
-				audio = upSample(audio, SampleRate, soundcardSampleRate);
-				for (let i in audio) 
-					outData[i] = audio[i];
-				enterState( idleState );
+				liveSource.connect(node);
+				node.connect(context.destination);
+			},(err) => { console.log(err); });
+		} else {
+			alert('getUserMedia() is not supported in your browser');
+		}
+	}
+
+	// Resamplers
+	//
+	downSample( buffer, originalSampleRate, resampledRate) {
+		let resampledBufferLength = Math.round( buffer.length * resampledRate / originalSampleRate );
+		let resampleRatio = buffer.length / resampledBufferLength;
+		let outputData = new Array(resampledBufferLength).fill(0);
+		for ( let i = 0; i < resampledBufferLength - 1; i++ ) {
+			let resampleValue = ( resampleRatio - 1 ) + ( i * resampleRatio );
+			let nearestPoint = Math.round( resampleValue );
+			for ( let tap = -1; tap < 2; tap++ ) {
+				let sampleValue = buffer[ nearestPoint + tap ];
+				if (isNaN(sampleValue)) sampleValue = this.upCache[ 1 + tap ];
+					if (isNaN(sampleValue)) sampleValue = buffer[ nearestPoint ];
+				outputData[ i ] += sampleValue * this.magicKernel( resampleValue - nearestPoint - tap );
 			}
-			liveSource.connect(node);
-			node.connect(context.destination);
-		}, function (err) { console.log(err); });
-	} else {
-		alert('getUserMedia() is not supported in your browser');
-	}
-}
-
-// Resamplers
-//
-var  downCache = [0.0,0.0];
-function downSample( buffer, originalSampleRate, resampledRate) {
-	let resampledBufferLength = Math.round( buffer.length * resampledRate / originalSampleRate );
-	let resampleRatio = buffer.length / resampledBufferLength;
-	let outputData = new Array(resampledBufferLength).fill(0);
-	for ( let i = 0; i < resampledBufferLength - 1; i++ ) {
-		let resampleValue = ( resampleRatio - 1 ) + ( i * resampleRatio );
-		let nearestPoint = Math.round( resampleValue );
-		for ( let tap = -1; tap < 2; tap++ ) {
-			let sampleValue = buffer[ nearestPoint + tap ];
-			if (isNaN(sampleValue)) sampleValue = upCache[ 1 + tap ];
-				if (isNaN(sampleValue)) sampleValue = buffer[ nearestPoint ];
-			outputData[ i ] += sampleValue * magicKernel( resampleValue - nearestPoint - tap );
 		}
+		this.downCache[ 0 ] = buffer[ buffer.length - 2 ];
+		this.downCache[ 1 ] = outputData[ resampledBufferLength - 1 ] = buffer[ buffer.length - 1 ];
+		return outputData;
 	}
-	downCache[ 0 ] = buffer[ buffer.length - 2 ];
-	downCache[ 1 ] = outputData[ resampledBufferLength - 1 ] = buffer[ buffer.length - 1 ];
-	return outputData;
-}
 
-var  upCache = [0.0,0.0];
-function upSample( buffer, originalSampleRate, resampledRate) {
-	let resampledBufferLength = Math.round( buffer.length * resampledRate / originalSampleRate );
-	let resampleRatio = buffer.length / resampledBufferLength;
-	let outputData = new Array(resampledBufferLength).fill(0);
-	for ( var i = 0; i < resampledBufferLength - 1; i++ ) {
-		let resampleValue = ( resampleRatio - 1 ) + ( i * resampleRatio );
-		let nearestPoint = Math.round( resampleValue );
-		for ( let tap = -1; tap < 2; tap++ ) {
-			let sampleValue = buffer[ nearestPoint + tap ];
-			if (isNaN(sampleValue)) sampleValue = upCache[ 1 + tap ];
-				if (isNaN(sampleValue)) sampleValue = buffer[ nearestPoint ];
-			outputData[ i ] += sampleValue * magicKernel( resampleValue - nearestPoint - tap );
+	upSample( buffer, originalSampleRate, resampledRate) {
+		let resampledBufferLength = Math.round( buffer.length * resampledRate / originalSampleRate );
+		let resampleRatio = buffer.length / resampledBufferLength;
+		let outputData = new Array(resampledBufferLength).fill(0);
+		for ( let i = 0; i < resampledBufferLength - 1; i++ ) {
+			let resampleValue = ( resampleRatio - 1 ) + ( i * resampleRatio );
+			let nearestPoint = Math.round( resampleValue );
+			for ( let tap = -1; tap < 2; tap++ ) {
+				let sampleValue = buffer[ nearestPoint + tap ];
+				if (isNaN(sampleValue)) sampleValue = this.upCache[ 1 + tap ];
+					if (isNaN(sampleValue)) sampleValue = buffer[ nearestPoint ];
+				outputData[ i ] += sampleValue * this.magicKernel( resampleValue - nearestPoint - tap );
+			}
 		}
+		this.upCache[ 0 ] = buffer[ buffer.length - 2 ];
+		this.upCache[ 1 ] = outputData[ resampledBufferLength - 1 ] = buffer[ buffer.length - 1 ];
+		return outputData;
 	}
-	upCache[ 0 ] = buffer[ buffer.length - 2 ];
-	upCache[ 1 ] = outputData[ resampledBufferLength - 1 ] = buffer[ buffer.length - 1 ];
-	return outputData;
-}
 
-// From http://johncostella.webs.com/magic/
-function magicKernel( x ) {
-  if ( x < -0.5 ) {
-    return 0.5 * ( x + 1.5 ) * ( x + 1.5 );
-  }
-  else if ( x > 0.5 ) {
-    return 0.5 * ( x - 1.5 ) * ( x - 1.5 );
-  }
-  return 0.75 - ( x * x );
+	// From http://johncostella.webs.com/magic/
+	magicKernel( x ) {
+	  if ( x < -0.5 ) {
+	    return 0.5 * ( x + 1.5 ) * ( x + 1.5 );
+	  }
+	  else if ( x > 0.5 ) {
+	    return 0.5 * ( x - 1.5 ) * ( x - 1.5 );
+	  }
+	  return 0.75 - ( x * x );
+	}
 }
-
+export default AudioHandler;
