@@ -98,6 +98,7 @@ var io  = require('socket.io').listen(server, { log: false });
 function createClientBuffer(client) {
 	let buffer = new ClientBuffer();
 	buffer.clientID = client;
+	buffer.newBuf = true;
 	receiveBuffer.push(buffer);
 	return buffer;
 }
@@ -256,14 +257,17 @@ function applyAutoGain(audio, startGain) {		// Auto gain control
 // The main working function where audio marsahlling, mixing and sending happens
 function generateMix () {
 	let readyToMix = false;
+	let numberOfClients = receiveBuffer.length;
 	if (isTimeToMix()) readyToMix = true;
-	else {				// It isn't time to mix but is there enough data to mix anyway?
-		let b;
-		readyToMix = true;	// Assume there IS enough data, but if any buffer is short, no mix
-		receiveBuffer.forEach( b => { if (b.packets.length < mixTriggerLevel) readyToMix = false; });
+	else {								// It isn't time to mix. Is there enough to mix anyway?
+		let newBufs = 0; let bigBufs = 0;		// Very explicit logic because this has caused 
+		receiveBuffer.forEach( b => {				// a lot of trouble!
+			if (b.newBuf == true) newBufs++;
+			if (b.packets.length > mixTriggerLevel) bigBufs++;
+		});							// If all buffers are either new or full enough
+		if ((newBufs + bigBufs) == numberOfClients) readyToMix = true;
 	}
 	if (readyToMix) {
-		let numberOfClients = receiveBuffer.length;
 		let mix = new Array(packetSize).fill(0); 		// The mixed audio we will return to all clients
 		let clientPackets = []; 				// All client audio packets that are part of the mix
 		let client = receiveBuffer.length -1;			// We start at the end of the array going backwards

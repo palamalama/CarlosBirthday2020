@@ -1,5 +1,5 @@
 export class AudioHandler {
-	constructor(socketId){
+	constructor(){
 		//Global variables
 		//
 		this.SampleRate = 16000; 		// Global sample rate used for all audio
@@ -37,8 +37,11 @@ export class AudioHandler {
 		this.downCache = [0.0,0.0];
 		this.upCache = [0.0,0.0];
 		
+		this.socketId = "";
+		setInterval(this.printReport.bind(this), 10000);
+	}
+	setSocketId(socketId){
 		this.socketId = socketId;
-		setInterval(this.printReport.bind(this), 1000);
 	}
 	printReport() {
 		console.log("Idle = ", this.idleState.total, " data in = ", this.dataInState.total, " audio in/out = ", this.audioInOutState.total);
@@ -71,7 +74,8 @@ export class AudioHandler {
 			let mix = [];	// Build up a mix of client audio 
 			let clients = data.c; 
 			for (let c=0; c < clients.length; c++) {
-				if (clients[c].clientID != this.socketId) {
+				if (clients[c].clientID != this.socketId || true) {
+					console.log(this.socketId);
 					let a = clients[c].packet.audio;
 					this.timeGap += now - clients[c].packet.timeEmitted;
 					if (mix.length == 0)

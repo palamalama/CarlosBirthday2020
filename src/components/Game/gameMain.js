@@ -46,17 +46,16 @@ class Game extends React.Component {
 		this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
 	}
 	audioRecorded(audio){
-		this.socket.emit("u",{
-			"audio": audio,
-			"sequence": packetSequence,
-			"timeEmitted": new Date().getTime()
-		});
+		this.socket.emit("u",audio);
 	}
 	teardownAudio(){
 	}
 	setupSocket(){
-		this.socket = openSocket();	
-		this.audioHandler = new AudioHandler(this.socket.id);
+		this.socket = openSocket();
+		this.audioHandler = new AudioHandler();
+		this.socket.on("connect", () => {
+			this.audioHandler.setSocketId(this.socket.id);
+		});
 		this.socket.on("setup",(response) => {
 			let people = response.data.people;
 			let me = people[response.new_user_id];
@@ -82,11 +81,13 @@ class Game extends React.Component {
 				people:newPeople
 			});
 		});
+		console.log("REACHING THiS PART OF THE CODE");
 		this.socket.on("d",(data) => {
-			//console.log("Recieved Audio!!", data);
+			console.log("Recieved Audio!!", data);
 			this.audioHandler.playAudio(data);
 		});
 		this.socket.emit("upstreamHi");
+		console.log("CODE EXECUTED");
 	}
 	teardownSocket(){
 		this.socket.emit("disconnect");
