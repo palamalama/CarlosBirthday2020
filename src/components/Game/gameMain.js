@@ -77,17 +77,22 @@ class Game extends React.Component {
 					newPeople[personId] = {"state":"deleted"};
 				}
 			});
+			Object.keys(newPeople).forEach((personId) => {
+				newPeople[personId].distance = getDistance(newPeople[personId],this.state.me);
+			});
 			this.setState({
 				people:newPeople
 			});
 		});
-		console.log("REACHING THiS PART OF THE CODE");
 		this.socket.on("d",(data) => {
-			console.log("Recieved Audio!!", data);
+			data.c.forEach((client,index) => {
+				if(client.clientID != this.state.me.id){	 
+					data.c[index].volume = Math.min(5,15/Math.pow(Math.max(5,this.state.people[client.clientID].distance-100),2) );
+				}
+			});
 			this.audioHandler.playAudio(data);
 		});
 		this.socket.emit("upstreamHi");
-		console.log("CODE EXECUTED");
 	}
 	teardownSocket(){
 		this.socket.emit("disconnect");
@@ -116,9 +121,18 @@ class Game extends React.Component {
 		let length = Math.max(0.001,Math.sqrt(dx*dx + dy*dy)-200);
 		newState.me.x += dx/length*Math.min(length/100,1);	
 		newState.me.y += dy/length*Math.min(length/100,1);
+		Object.keys(newState.people).forEach( personId => {
+			newState.people[personId].distance = getDistance(newState.people[personId],newState.me);
+		});
 		this.setState(newState);
 		this.socket.emit("update",this.state.me);
 	}
 
 }
 export default Game;
+
+function getDistance(object1, object2){
+	let dx = object1.x - object2.x;
+	let dy = object1.y - object2.y;
+	return Math.sqrt(dx*dx + dy*dy);
+}

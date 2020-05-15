@@ -69,23 +69,18 @@ export class AudioHandler {
 	playAudio(data){
 		this.enterState( this.dataInState );
 		this.packetsIn++;
-		let now = new Date().getTime();
 		if (this.micAccessAllowed) {	// Need access to audio before outputing
-			let mix = [];	// Build up a mix of client audio 
+			let mix = new Array(this.PacketSize).fill(0);	// Build up a mix of client audio 
 			let clients = data.c; 
-			for (let c=0; c < clients.length; c++) {
-				if (clients[c].clientID != this.socketId || true) {
-					console.log(this.socketId);
-					let a = clients[c].packet.audio;
-					this.timeGap += now - clients[c].packet.timeEmitted;
-					if (mix.length == 0)
-						for (let i=0; i < a.length; i++)
-							mix[i] = a[i];
-					else
-						for (let i=0; i < a.length; i++)
-							mix[i] += a[i];
+			data.c.forEach( (client) => { 
+				if (client.clientID != this.socketId) {
+					let a = client.packet.audio;
+					this.timeGap += new Date().getTime() - client.packet.timeEmitted;
+					a.forEach((v,index) => {
+						mix[index] += v*client.volume;
+					});
 				}
-			}
+			});
 			if (mix.length != 0) {
 				for (let i in mix) this.spkrBuffer.push(mix[i]);
 				if (this.spkrBuffer.length > this.maxBuffSize) {
@@ -132,21 +127,18 @@ export class AudioHandler {
 					this.enterState( this.audioInOutState );
 					let inData = e.inputBuffer.getChannelData(0);
 					let outData = e.outputBuffer.getChannelData(0);
-					let audio = [];
-					if (true) {		// Mic audio can be sent to server
-						audio = this.downSample(inData, this.soundcardSampleRate, this.SampleRate);
-						this.resampledChunkSize = audio.length;
-						for (let i in audio) this.micBuffer.push(audio[i]);
-						if (this.micBuffer.length > this.PacketSize) {
-							audio = this.micBuffer.splice(0, this.PacketSize);
-							callback({
-								"audio": audio,
-								"sequence": this.packetSequence,
-								"timeEmitted": new Date().getTime()
-							});
-							this.packetsOut++;
-							this.packetSequence++;
-						}
+					let audio = this.downSample(inData, this.soundcardSampleRate, this.SampleRate);
+					this.resampledChunkSize = audio.length;
+					for (let i in audio) this.micBuffer.push(audio[i]);
+					if (this.micBuffer.length > this.PacketSize) {
+						audio = this.micBuffer.splice(0, this.PacketSize);
+						callback({
+							"audio": audio,
+							"sequence": this.packetSequence,
+							"timeEmitted": new Date().getTime()
+						});
+						this.packetsOut++;
+						this.packetSequence++;
 					}
 					if (this.spkrBuffer.length > this.resampledChunkSize) 
 						audio = this.spkrBuffer.splice(0,this.resampledChunkSize);

@@ -103,7 +103,6 @@ function createClientBuffer(client) {
 	return buffer;
 }
 
-let connection_id = 0;
 let data = {
 	people:{
 		"-1":{
@@ -116,12 +115,11 @@ let data = {
 // socket event and audio handling area
 io.sockets.on('connection', function (socket) {
 	//ERIC STUFF
-	let id = connection_id ++;
-	let newPerson = {"name":id,"id":id,x:Math.random()*100,y:Math.random()*100,size:10,state:"alive"};
-	data.people[id] = newPerson;
+	let newPerson = {"name":socket.id,"id":socket.id,x:Math.random()*100,y:Math.random()*100,size:10,state:"alive"};
+	data.people[socket.id] = newPerson;
 	data.people["-1"].x = 5;
 	data.people["-1"].y = 5;
-	socket.emit("setup",{data:data,new_user_id:id});
+	socket.emit("setup",{data:data,new_user_id:socket.id});
 	console.log("Connected ",socket.handshake.address, newPerson);
 	
 	
@@ -139,7 +137,7 @@ io.sockets.on('connection', function (socket) {
 		// No need to remove the client's buffer as it will happen automatically
 		clientsLive--;
 
-		delete data.people[id];
+		delete data.people[socket.id];
 	});
 
 	socket.on('downstreamHi', function (data) {
