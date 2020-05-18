@@ -127,7 +127,6 @@ export class AudioHandler {
 					this.enterState( this.audioInOutState );
 					let inData = e.inputBuffer.getChannelData(0);
 					let outData = e.outputBuffer.getChannelData(0);
-					let micAudio = [];
 					let micAudio = this.downSample(inData, this.soundcardSampleRate, this.SampleRate);
 					this.resampledChunkSize = micAudio.length;
 					this.micBuffer.push(...micAudio);
