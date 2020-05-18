@@ -32,12 +32,9 @@ var idleState = new stateTimer(); 	idleState.name = "Idle";
 var upstreamState = new stateTimer();	upstreamState.name = "Upstream";
 var downstreamState = new stateTimer();	downstreamState.name = "Downstream";
 var genMixState = new stateTimer();	genMixState.name = "Generate Mix";
-let d = new Date();			// Set the state at start to Idle
-let t = d.getTime();			// and manually set start time
-var currentState = idleState;		currentState.start = t;
+var currentState = idleState;		currentState.start = new Date().getTime();
 function enterState( newState ) {
-	let d = new Date();
-	let now = d.getTime();
+	let now = new Date().getTime();
 	currentState.total += now - currentState.start;
 	newState.start = now;
 	currentState = newState;
@@ -51,7 +48,6 @@ var overflows = 0;
 var shortages = 0;
 var clientsLive = 0;
 var forcedMixes = 0;
-var threadCount = 0;
 var packetClassifier = [];
 packetClassifier.fill(0,0,30);
 
@@ -92,6 +88,7 @@ if (PORT == undefined) {		// Not running on heroku so use SSL
 		console.log("Server running on ",PORT);
 	});
 }
+
 var io  = require('socket.io').listen(server, { log: false });
 
 
@@ -133,18 +130,12 @@ io.sockets.on('connection', function (socket) {
 
 	socket.on('disconnect', function () {
 		console.log("User disconnected:", socket.id);
-		console.log("Idle = ", idleState.total, " upstream = ", upstreamState.total, " downstream = ", downstreamState.total, " genMix = ", genMixState.total);
 		// No need to remove the client's buffer as it will happen automatically
 		clientsLive--;
 
 		delete data.people[socket.id];
 	});
 
-	socket.on('downstreamHi', function (data) {
-		// The upstream server is registering with us
-		// There can only be one upstream server
-		upstreamServer = socket.id; 
-	});
 	socket.on('upstreamHi', function (data) {
 		// A downstream server or client is registering with us
 		// Add the downstream node to the group for notifications
@@ -152,28 +143,11 @@ io.sockets.on('connection', function (socket) {
 		socket.join('downstream');
 	});
 
-	// Audio coming down from our upstream server. It is a mix of all the audio above and beside us
-	socket.on('d', function (packet) {
-		enterState( upstreamState );
-		// If no downstream clients ignore packet and empty upstream buffers
-		if (receiveBuffer.length == 0) { upstreamBuffer = []; oldUpstreamBuffer = []; }
-		else {
-			// TODO: Remove my audio from mix to avoid echo
-			upstreamBuffer.push(packet); 
-			packetSize = packet.a.length;
-			enterState( genMixState );
-			generateMix();
-		}
-		enterState( idleState );
-	});
-
 	// Audio coming up from one of our downstream clients
 	socket.on('u', function (data) {
 		enterState( downstreamState );
-		threadCount++;
 		let client = socket.id;
 		let packet = {audio: data["audio"], sequence: data["sequence"], timeEmitted: data["timeEmitted"]};
-		let b = 0;
 		let buffer = null;
 		packetSize = packet.audio.length;	// Need to know how much audio we are processing
 		if (receiveBuffer.length == 0) {	// First client, so create buffer right now
@@ -208,11 +182,11 @@ setInterval(() => {
 //
 //
 function isTimeToMix() {	// Test if we must generate a mix regardless
-	let d = new Date();
-	let now = d.getTime();		
-	if ((nextMixTimeLimit != 0) && (now >= nextMixTimeLimit)) 
+	let now = new Date().getTime();
+	if ((nextMixTimeLimit != 0) && (now >= nextMixTimeLimit))  {
+		forcedMixes++;
 		return true;
-	else
+	} else
 		return false;
 }
 
@@ -276,8 +250,10 @@ function generateMix () {
 				newTrack.clientID = clientBuffer.clientID;	// Get clientID for audio packet
 				newTrack.packet = clientBuffer.packets.shift();	// Get first packet of audio
 				if (newTrack.packet == undefined) {		// If this client buffer has been emptied...
-					receiveBuffer.splice(client, 1); 	// remove client buffer
 					shortages++;
+					receiveBuffer.splice(client, 1); 	// remove client buffer
+					if (receiveBuffer.length == 1)		// if only one client left
+						nextMixTimeLimit = 0;		// stop sample timer 
 				}
 				else {
 					clientPackets.push( newTrack );		// Store packet of source audio 
@@ -292,14 +268,12 @@ function generateMix () {
 			});
 			packetsOut++;			// Sent data so log it and set time limit for next send
 			if (nextMixTimeLimit == 0) {	// If this is the first send event then start at now
-				let d = new Date();
-				let now = d.getTime();		
+				let now = new Date().getTime();
 				nextMixTimeLimit = now;
 			}
 			nextMixTimeLimit = nextMixTimeLimit + (mix.length * 1000)/SampleRate;
 		}
 	}
-	threadCount--;
 }
 
 
@@ -308,7 +282,7 @@ function generateMix () {
 const updateTimer = 10000;	// Frequency of updates to the console
 function printReport() {
 	console.log("Idle = ", idleState.total, " upstream = ", upstreamState.total, " downstream = ", downstreamState.total, " genMix = ", genMixState.total);
-	console.log("Clients = ",clientsLive,"  active = ", receiveBuffer.length,"In = ",packetsIn," Out = ",packetsOut," overflows = ",overflows," shortages = ",shortages," forced mixes = ",forcedMixes," threads = ",threadCount);
+	console.log("Clients = ",clientsLive,"  active = ", receiveBuffer.length,"In = ",packetsIn," Out = ",packetsOut," overflows = ",overflows," shortages = ",shortages," forced mixes = ",forcedMixes);
 	let s = "Client buffer lengths: ";
 	for (c in receiveBuffer)
 		s = s + receiveBuffer[c].packets.length +" ";
