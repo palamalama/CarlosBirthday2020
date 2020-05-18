@@ -20,7 +20,7 @@ export class AudioHandler {
 		this.idleState = this.stateTimer(); 		this.idleState.name = "Idle";
 		this.dataInState = this.stateTimer();		this.dataInState.name = "Data In";
 		this.audioInOutState = this.stateTimer();	this.audioInOutState.name = "Audio In/Out";
-		this.currentState = this.idleState;			this.currentState.start = new Date().getTime();
+		this.currentState = this.idleState;		this.currentState.start = new Date().getTime();
 
 		// Reporting code. Accumulators, interval timer and report generator
 		//
@@ -82,7 +82,7 @@ export class AudioHandler {
 				}
 			});
 			if (mix.length != 0) {
-				for (let i in mix) this.spkrBuffer.push(mix[i]);
+				this.spkrBuffer.push(...mix);
 				if (this.spkrBuffer.length > this.maxBuffSize) {
 					this.spkrBuffer.splice(0, (this.spkrBuffer.length-this.maxBuffSize)); 	
 					this.overflows++;
@@ -108,7 +108,7 @@ export class AudioHandler {
 			let context = new window.AudioContext || new window.webkitAudioContext;
 			this.soundcardSampleRate = context.sampleRate;
 			let constraints = { mandatory: {
-						googEchoCancellation: false,
+						googEchoCancellation: true,
 						googAutoGainControl: false,
 						googNoiseSuppression: false,
 						googHighpassFilter: false
@@ -127,28 +127,32 @@ export class AudioHandler {
 					this.enterState( this.audioInOutState );
 					let inData = e.inputBuffer.getChannelData(0);
 					let outData = e.outputBuffer.getChannelData(0);
-					let audio = this.downSample(inData, this.soundcardSampleRate, this.SampleRate);
-					this.resampledChunkSize = audio.length;
-					for (let i in audio) this.micBuffer.push(audio[i]);
+					let micAudio = [];
+					let micAudio = this.downSample(inData, this.soundcardSampleRate, this.SampleRate);
+					this.resampledChunkSize = micAudio.length;
+					this.micBuffer.push(...micAudio);
 					if (this.micBuffer.length > this.PacketSize) {
-						audio = this.micBuffer.splice(0, this.PacketSize);
+						let outAudio = this.micBuffer.splice(0, this.PacketSize);
 						callback({
-							"audio": audio,
+							"audio": outAudio,
 							"sequence": this.packetSequence,
 							"timeEmitted": new Date().getTime()
 						});
 						this.packetsOut++;
 						this.packetSequence++;
 					}
+					let inAudio = [];
 					if (this.spkrBuffer.length > this.resampledChunkSize) 
-						audio = this.spkrBuffer.splice(0,this.resampledChunkSize);
+						inAaudio = this.spkrBuffer.splice(0,this.resampledChunkSize);
 					else {	
-						audio.fill(0,0,(this.resampledChunkSize-1));
+						inAudio = this.spkrBuffer.splice(0,this.spkrBuffer.length);
+						let zeros = new Array(this.resampledChunkSize-this.spkrBuffer.length).fill(0);
+						inAudio.push(...zeros);
 						this.shortages++;
 					}
-					audio = this.upSample(audio, this.SampleRate, this.soundcardSampleRate);
-					for (let i in audio) 
-						outData[i] = audio[i];
+					let spkrAudio = this.upSample(inAudio, this.SampleRate, this.soundcardSampleRate);
+					for (let i in outData) 
+						outData[i] = spkrAudio[i];
 					this.enterState( this.idleState );
 				}
 				liveSource.connect(node);
@@ -181,7 +185,7 @@ export class AudioHandler {
 	}
 
 	upSample( buffer, originalSampleRate, resampledRate) {
-		let resampledBufferLength = Math.round( buffer.length * resampledRate / originalSampleRate );
+		let resampledBufferLength = this.chunkSize;		// Forcing to always fill the outbuffer fully
 		let resampleRatio = buffer.length / resampledBufferLength;
 		let outputData = new Array(resampledBufferLength).fill(0);
 		for ( let i = 0; i < resampledBufferLength - 1; i++ ) {
