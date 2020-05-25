@@ -122,6 +122,7 @@ io.sockets.on('connection', function (socket) {
 	
 	socket.on("update",(updatedPerson) => {
 		data.people[updatedPerson.id] = updatedPerson;
+		socket.emit('update', data);
 	});
 
 	//ERIC STUFF
@@ -175,7 +176,6 @@ io.sockets.on('connection', function (socket) {
 setInterval(() => {
 	data.people["-1"].x += Math.random()*2-1;
 	data.people["-1"].y += Math.random()*2-1;
-	io.sockets.emit('update', data);
 }, 50);
 
 // Audio management, marshalling and manipulation code

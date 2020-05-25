@@ -37,9 +37,9 @@ class Game extends React.Component {
 	}
 
 	componentDidMount() {
+		this.setupGame();
 		this.setupSocket();
 		this.setupAudio();
-		this.setupGame();
 	}
 	componentDidUpdate(){
 	}	
@@ -66,7 +66,7 @@ class Game extends React.Component {
 				people:people,
 				me:me
 			});
-			this.updatePositionInterval = setInterval(() => this.updatePosition(), 100);
+			this.updatePositionInterval = setInterval(() => this.updatePosition(), 50);
 		});
 		this.socket.on("update",(data) => {
 			let newPeople = data.people;
