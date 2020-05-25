@@ -11,10 +11,10 @@ class Game extends React.Component {
 	constructor(props){
 		super(props);
 		this.updateMousePosition = this.updateMousePosition.bind(this);
-		this.setCenterOfScreen = this.setCenterOfScreen.bind(this);
 		this.state = {
 			people:{},
-			me:{"name":"Big baby","size":10,"x":0,"y":0,state:"alive"}
+			me:{"name":"Big baby","size":10,"x":0,"y":0,state:"alive"},
+			centerOfScreen:{x:0,y:0}
 		}
 		
 	}
@@ -22,7 +22,7 @@ class Game extends React.Component {
 		return (
 			<div style={{"margin":"0","width":"100%","height":"100%"}}>
 				<svg className="MainSVG" ref={(svg) => this.svg = svg} onMouseMove={this.updateMousePosition} style={{"margin":"0","width":"100%","height":"100%"}}>
-					<MainCharacter me={this.state.me} setCenterOfScreen={this.setCenterOfScreen}/>
+					<MainCharacter me={this.state.me} center={this.state.centerOfScreen}/>
 					{Object.values(this.state.people)
 						.map((person) => (
 							<Person person={person}
@@ -39,14 +39,15 @@ class Game extends React.Component {
 	componentDidMount() {
 		this.setupSocket();
 		this.setupAudio();
+		this.setupGame();
 	}
 	componentDidUpdate(){
 	}	
 	setupAudio(){
-		this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
+		//this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
 	}
 	audioRecorded(audio){
-		this.socket.emit("u",audio);
+		//this.socket.emit("u",audio);
 	}
 	teardownAudio(){
 	}
@@ -102,9 +103,13 @@ class Game extends React.Component {
 		teardownAudio();
 		teardownSocket();
 	}
-	setCenterOfScreen(pos){
+	setupGame(){	
+		this.updateCenterOfScreen();
+		window.addEventListener('resize', this.updateCenterOfScreen.bind(this));
+	}
+	updateCenterOfScreen(){
 		this.setState({
-			centerOfScreen:pos
+			centerOfScreen:{x:this.svg.getBoundingClientRect().width/2,y: this.svg.getBoundingClientRect().height/2}
 		});
 	}
 	updateMousePosition(e){
