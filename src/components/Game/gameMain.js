@@ -27,7 +27,7 @@ class Game extends React.Component {
 						.map((person) => (
 							<Person person={person}
 								mainCharacter={this.state.me} 
-								centerCoordinates={this.state.centerOfScreen || {x:0,y:0}}
+								centerCoordinates={this.state.centerOfScreen}
 							/>
 						))
 					}
@@ -117,15 +117,9 @@ class Game extends React.Component {
 	}
 	updatePosition(){
 		let newState = this.state;
-		let dx = 0;
-		let dy = 0;
-		if(this.mousePosition){
-			dx = (this.mousePosition.x - this.state.centerOfScreen.x);
-			dy = (this.mousePosition.y - this.state.centerOfScreen.y);
-		}
-		let length = Math.max(0.001,Math.sqrt(dx*dx + dy*dy)-200);
-		newState.me.x += dx/length*Math.min(length/100,1);	
-		newState.me.y += dy/length*Math.min(length/100,1);
+		let velocity = determineVelocity(this.mousePosition|| this.state.centerOfScreen, this.state.centerOfScreen);
+		newState.me.x += velocity.x;	
+		newState.me.y += velocity.y;
 		Object.keys(newState.people).forEach( personId => {
 			newState.people[personId].distance = getDistance(newState.people[personId],newState.me);
 		});
@@ -140,4 +134,17 @@ function getDistance(object1, object2){
 	let dx = object1.x - object2.x;
 	let dy = object1.y - object2.y;
 	return Math.sqrt(dx*dx + dy*dy);
+}
+function determineVelocity(mousePos,characterPos){
+	let relPos = {
+		x: mousePos.x - characterPos.x,
+		y: mousePos.y - characterPos.y
+	};
+	let distance = Math.max(1,getDistance(mousePos, characterPos));
+	let unitVelocity = {x:relPos.x/distance,y:relPos.y/distance};
+	if(distance < 20){
+		return {x:0,y:0};
+	}
+	let speed = Math.min((distance-20)/40,5); //maxes out at a distance of 220 with a speed of 5
+	return {x:unitVelocity.x*speed,y:unitVelocity.y*speed};
 }
