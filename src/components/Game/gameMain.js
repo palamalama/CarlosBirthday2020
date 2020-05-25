@@ -44,10 +44,10 @@ class Game extends React.Component {
 	componentDidUpdate(){
 	}	
 	setupAudio(){
-		//this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
+		this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
 	}
 	audioRecorded(audio){
-		//this.socket.emit("u",audio);
+		this.socket.emit("u",audio);
 	}
 	teardownAudio(){
 	}
