@@ -103,26 +103,36 @@ function createClientBuffer(client) {
 let data = {
 	people:{
 		"-1":{
-			"name": "A realtime random boy","size":10,"id":"-1","x":5,"y":5,state:"alive"
+			"name": "A realtime random boy","size":9,"id":"-1","x":5,"y":5,state:"alive"
 		},
 	}
 };
-
+function createPerson(id){
+	return {"name":id,"id":id,x:Math.random()*100,y:Math.random()*100,size:10,state:"alive"};
+}
+function getDistance(object1, object2){
+	let dx = object1.x - object2.x;
+	let dy = object1.y - object2.y;
+	return Math.sqrt(dx*dx + dy*dy);
+}
 
 // socket event and audio handling area
 io.sockets.on('connection', function (socket) {
 	//ERIC STUFF
-	let newPerson = {"name":socket.id,"id":socket.id,x:Math.random()*100,y:Math.random()*100,size:10,state:"alive"};
-	data.people[socket.id] = newPerson;
-	data.people["-1"].x = 5;
-	data.people["-1"].y = 5;
-	socket.emit("setup",{data:data,new_user_id:socket.id});
-	console.log("Connected ",socket.handshake.address, newPerson);
+	let id = socket.id;
+	data.people[id] = createPerson(id);
+	socket.emit("setup",{data:data,new_user_id:id});
+	console.log("Connected ",socket.handshake.address, data.people[id]);
 	
 	
-	socket.on("update",(updatedPerson) => {
-		data.people[updatedPerson.id] = updatedPerson;
-		socket.emit('update', data);
+	socket.on("character_update",(updatedPerson) => {
+		data.people[id] = updatedPerson;
+		socket.emit('world_update', data);
+	});
+	socket.on("character_eaten",(eatenId) => {
+		console.log(eatenId,"just got eaten");
+		data.people[eatenId] = {"status": "deleted"};
+		io.to(eatenId).emit("you_got_eaten");
 	});
 
 	//ERIC STUFF

@@ -5,7 +5,6 @@ import Person from "./person";
 import MainCharacter from "./mainCharacter";
 import AudioHandler from "./Audio/AudioHandler";
 
-var packetSequence = 0; 
 
 class Game extends React.Component {
 	constructor(props){
@@ -41,10 +40,12 @@ class Game extends React.Component {
 		this.setupSocket();
 		this.setupAudio();
 	}
-	componentDidUpdate(){
-	}	
+	componentWillUnmount() {
+		this.teardownAudio();
+		this.teardownSocket();
+	}
 	setupAudio(){
-		this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
+		//this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
 	}
 	audioRecorded(audio){
 		this.socket.emit("u",audio);
@@ -66,9 +67,9 @@ class Game extends React.Component {
 				people:people,
 				me:me
 			});
-			this.updatePositionInterval = setInterval(() => this.updatePosition(), 50);
+			this.updateGameInterval = setInterval(() => this.updateGame(), 50);
 		});
-		this.socket.on("update",(data) => {
+		this.socket.on("world_update",(data) => {
 			let newPeople = data.people;
 			let oldPeople = this.state.people;
 			delete newPeople[this.state.me.id];
@@ -77,6 +78,9 @@ class Game extends React.Component {
 				if(!peopleStillOnTheMap.includes(personId)){
 					newPeople[personId] = {"state":"deleted"};
 				}
+				if(oldPeople[personId].state == "deleted"){
+					newPeople[personId] = {"state": "deleted"};
+				}
 			});
 			Object.keys(newPeople).forEach((personId) => {
 				newPeople[personId].distance = getDistance(newPeople[personId],this.state.me);
@@ -84,6 +88,10 @@ class Game extends React.Component {
 			this.setState({
 				people:newPeople
 			});
+		});
+		this.socket.on("you_got_eaten",() => {
+			window.location.reload(false);
+
 		});
 		this.socket.on("d",(data) => {
 			data.c.forEach((client,index) => {
@@ -97,11 +105,7 @@ class Game extends React.Component {
 	}
 	teardownSocket(){
 		this.socket.emit("disconnect");
-		clearInterval(this.updatePositionInterval);
-	}
-	componentWillUnmount() {
-		teardownAudio();
-		teardownSocket();
+		clearInterval(this.updateGameInterval);
 	}
 	setupGame(){	
 		this.updateCenterOfScreen();
@@ -115,6 +119,10 @@ class Game extends React.Component {
 	updateMousePosition(e){
 		this.mousePosition = {x:e.clientX,y:e.clientY};
 	}
+	updateGame(){
+		this.updatePosition();
+		this.checkForEdiblePeople();
+	}
 	updatePosition(){
 		let newState = this.state;
 		let velocity = determineVelocity(this.mousePosition|| this.state.centerOfScreen, this.state.centerOfScreen);
@@ -124,7 +132,26 @@ class Game extends React.Component {
 			newState.people[personId].distance = getDistance(newState.people[personId],newState.me);
 		});
 		this.setState(newState);
-		this.socket.emit("update",this.state.me);
+		this.socket.emit("character_update",this.state.me);
+	}
+	checkForEdiblePeople(){
+		Object.keys(this.state.people).forEach((personId) => {
+			if(this.state.people[personId].distance < Math.sqrt(this.state.me.size*3)){
+				if(this.state.people[personId].size < this.state.me.size){
+					console.log("I could have eaten him",personId);
+					let newMe = this.state.me;
+					newMe.size += this.state.people[personId].size;
+					let newPeople = this.state.people;
+					newPeople[personId] = {state:"deleted"};
+					this.setState({
+						people:newPeople,
+						me:newMe
+					})
+					this.socket.emit("character_eaten",personId);
+					this.socket.emit("character_update",this.state.me);
+				}
+			}
+		});
 	}
 
 }
