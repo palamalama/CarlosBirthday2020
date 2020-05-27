@@ -142,7 +142,7 @@ export class AudioHandler {
 					}
 					let inAudio = [];
 					if (this.spkrBuffer.length > this.resampledChunkSize) 
-						inAaudio = this.spkrBuffer.splice(0,this.resampledChunkSize);
+						inAudio = this.spkrBuffer.splice(0,this.resampledChunkSize);
 					else {	
 						inAudio = this.spkrBuffer.splice(0,this.spkrBuffer.length);
 						let zeros = new Array(this.resampledChunkSize-this.spkrBuffer.length).fill(0);

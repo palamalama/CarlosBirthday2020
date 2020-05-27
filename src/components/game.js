@@ -1,8 +1,7 @@
 import React from "react";
 import * as d3 from "d3";
 import openSocket from 'socket.io-client';
-import LoginPrompt from "./Prompts/login";
-import EatenPrompt from "./Prompts/eaten";
+import Prompt from "./Prompts/prompt";
 import Person from "./Characters/person";
 import MainCharacter from "./Characters/mainCharacter";
 import AudioHandler from "./Audio/AudioHandler";
@@ -19,7 +18,7 @@ class Game extends React.Component {
 		this.state = {
 			mainState:connectingState,
 			people:{},
-			me:{"name":"Big baby","size":10,"x":0,"y":0,state:"alive"},
+			me:{"name":"Big baby","size":10,"x":1000,"y":1000,state:"alive"},
 			centerOfScreen:{x:0,y:0}
 		}
 		
@@ -30,7 +29,7 @@ class Game extends React.Component {
 				<h1> Connecting... </h1>
 			);
 		}
-		else if(this.state.mainState == loggingInState){
+		else if(this.state.mainState == loggingInState || this.state.mainState == eatenState){
 			return (
 				<div style={{"margin":"0","width":"100%","height":"100%"}}>
 					<svg className="MainSVG" ref={(svg) => this.svg = svg} onMouseMove={this.updateMousePosition} style={{"margin":"0","width":"100%","height":"100%"}}>
@@ -42,27 +41,13 @@ class Game extends React.Component {
 								/>
 							))
 						}
-						<LoginPrompt login={this.login.bind(this)}/>
+						{(this.state.mainState == loggingInState) 
+						? <Prompt mainTitle={"Welcome to Carlos.io!"} textHeader={"Pick a name"} buttonText={"Join Room"} login={this.login.bind(this)}/>
+						: <Prompt mainTitle={"You got eaten in Carlos.io!"} textHeader={"Repick a name"} buttonText={"Rejoin Room"} login={this.login.bind(this)}/>
+						}
 					</svg>
 				</div>
 			);
-		}
-		else if(this.state.mainState == eatenState){
-			return (
-				<div style={{"margin":"0","width":"100%","height":"100%"}}>
-					<svg className="MainSVG" ref={(svg) => this.svg = svg} onMouseMove={this.updateMousePosition} style={{"margin":"0","width":"100%","height":"100%"}}>
-						{Object.values(this.state.people)
-							.map((person) => (
-								<Person person={person}
-									mainCharacter={this.state.me} 
-									centerCoordinates={this.state.centerOfScreen}
-								/>
-							))
-						}
-						<EatenPrompt login={this.login.bind(this)}/>
-					</svg>
-				</div>
-			);	
 		}
 		return (
 			<div style={{"margin":"0","width":"100%","height":"100%"}}>
@@ -107,13 +92,13 @@ class Game extends React.Component {
 		this.socket.on("world_update", this.worldUpdate.bind(this));
 		this.socket.on("d",this.audioRecieved.bind(this));
 		this.socket.on("you_got_eaten",this.eaten.bind(this));
-		//this.socket.emit("upstreamHi");
+		this.socket.emit("upstreamHi");
 	}
 	connected(){
 		this.backgroundUpdateInterval = setInterval(() => this.requestBackgroundData(),50);	
-		//this.audioHandler = new AudioHandler();
-		//this.audioHandler.setSocketId(this.socket.id);
-		//this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
+		this.audioHandler = new AudioHandler();
+		this.audioHandler.setSocketId(this.socket.id);
+		this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
 		this.setState({ mainState: loggingInState});
 	}
 	login(name){
@@ -148,7 +133,9 @@ class Game extends React.Component {
 			}
 		});
 		Object.keys(newPeople).forEach((personId) => {
-			newPeople[personId].distance = getDistance(newPeople[personId],this.state.me);
+			if(newPeople[personId].state == "alive"){
+				newPeople[personId].distance = getDistance(newPeople[personId],this.state.me);
+			}
 		});
 		this.setState({
 			people:newPeople
@@ -171,8 +158,15 @@ class Game extends React.Component {
 		let velocity = determineVelocity(this.mousePosition|| this.state.centerOfScreen, this.state.centerOfScreen);
 		newState.me.x += velocity.x;	
 		newState.me.y += velocity.y;
+		newState.me.x = Math.min(2000,newState.me.x);
+		newState.me.x = Math.max(0,newState.me.x);
+		newState.me.y = Math.min(2000,newState.me.y);
+		newState.me.y = Math.max(0,newState.me.y);
+
 		Object.keys(newState.people).forEach( personId => {
-			newState.people[personId].distance = getDistance(newState.people[personId],newState.me);
+			if(newState.people[personId].state == "alive"){
+				newState.people[personId].distance = getDistance(newState.people[personId],newState.me);
+			}
 		});
 		this.setState(newState);
 		this.socket.emit("character_update",this.state.me);
@@ -198,15 +192,25 @@ class Game extends React.Component {
 	}
 
 	audioRecorded(audio){
-		//this.socket.emit("u",audio);
+		this.socket.emit("u",audio);
 	}
 	audioRecieved(data){
 		data.c.forEach((client,index) => {
 			if(client.clientID != this.state.me.id){	 
-				data.c[index].volume = Math.min(5,15/Math.pow(Math.max(5,this.state.people[client.clientID].distance-100),2) );
+				let distance = (this.state.people[client.clientID] || {distance:100000}).distance;
+				data.c[index].volume = 0;
+				if(distance < 350){
+					data.c[index].volume = 0.05;
+				}
+				if(distance < 250){
+					data.c[index].volume = 0.1;
+				}
+				if(distance < 150){
+					data.c[index].volume = 0.5;
+				}	
 			}
 		});
-		//this.audioHandler.playAudio(data);
+		this.audioHandler.playAudio(data);
 
 	}
 	componentWillUnmount() {
@@ -222,7 +226,7 @@ class Game extends React.Component {
 export default Game;
 
 function createPerson(id, name){
-        return {"name":name,"id":id,x:Math.random()*100,y:Math.random()*100,size:10,state:"alive"};
+        return {"name":name,"id":id,x:Math.random()*2000,y:Math.random()*2000,size:10,state:"alive"};
 }
 function getDistance(object1, object2){
 	let dx = object1.x - object2.x;

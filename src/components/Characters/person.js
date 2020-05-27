@@ -30,8 +30,8 @@ class Person extends React.Component {
 		let fontSize = Math.sqrt(this.props.person.size)+15;
 
 		let transitionGroup = d3.select(this.person)
-			.transition()
-			.duration(100)
+	//		.transition()
+	//		.duration(100)
 			
 		transitionGroup.select("circle")
 			.attr("cx",x)

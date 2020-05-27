@@ -107,8 +107,8 @@ let data = {
 		},
 	}
 };
-function createPerson(id,name){
-	return {"name":name,"id":id,x:Math.random()*100,y:Math.random()*100,size:9,state:"alive"};
+function createPerson(id,name,size){
+	return {"name":name,"id":id,x:Math.random()*2000,y:Math.random()*2000,size:size,state:"alive"};
 }
 function getDistance(object1, object2){
 	let dx = object1.x - object2.x;
@@ -186,13 +186,18 @@ io.sockets.on('connection', function (socket) {
 });
 
 let counter = 0;
+let foodCounter = 0;
 setInterval(() => {
 	if(!data.people["-1"]){
-		data.people["-1"] = createPerson("-1","A realtime random boy "+(counter++));
+		data.people["-1"] = createPerson("-1","A realtime random boy "+(counter++),9);
 		console.log("Creating random boy");
 	}
 	data.people["-1"].x += Math.random()*2-1;
 	data.people["-1"].y += Math.random()*2-1;
+	
+	if(Object.keys(data.people).length < 50){
+		data.people[" "+(foodCounter++)] = createPerson(" "+foodCounter,"",1);
+	}
 }, 50);
 
 // Audio management, marshalling and manipulation code
