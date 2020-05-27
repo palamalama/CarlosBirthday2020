@@ -1,8 +1,10 @@
 import React from "react";
 import * as d3 from "d3";
 import openSocket from 'socket.io-client';
-import Person from "./person";
-import MainCharacter from "./mainCharacter";
+import LoginPrompt from "./Prompts/login";
+import EatenPrompt from "./Prompts/eaten";
+import Person from "./Characters/person";
+import MainCharacter from "./Characters/mainCharacter";
 import AudioHandler from "./Audio/AudioHandler";
 
 var connectingState = "connecting";
@@ -30,7 +32,7 @@ class Game extends React.Component {
 		}
 		else if(this.state.mainState == loggingInState){
 			return (
-				<div style={{"margin":"0","width":"100%","height":"100%"}} onClick={this.login.bind(this)}>
+				<div style={{"margin":"0","width":"100%","height":"100%"}}>
 					<svg className="MainSVG" ref={(svg) => this.svg = svg} onMouseMove={this.updateMousePosition} style={{"margin":"0","width":"100%","height":"100%"}}>
 						{Object.values(this.state.people)
 							.map((person) => (
@@ -40,13 +42,14 @@ class Game extends React.Component {
 								/>
 							))
 						}
+						<LoginPrompt login={this.login.bind(this)}/>
 					</svg>
 				</div>
 			);
 		}
 		else if(this.state.mainState == eatenState){
 			return (
-				<div style={{"margin":"0","width":"100%","height":"100%"}} onClick={this.login.bind(this)}>
+				<div style={{"margin":"0","width":"100%","height":"100%"}}>
 					<svg className="MainSVG" ref={(svg) => this.svg = svg} onMouseMove={this.updateMousePosition} style={{"margin":"0","width":"100%","height":"100%"}}>
 						{Object.values(this.state.people)
 							.map((person) => (
@@ -56,6 +59,7 @@ class Game extends React.Component {
 								/>
 							))
 						}
+						<EatenPrompt login={this.login.bind(this)}/>
 					</svg>
 				</div>
 			);	
@@ -112,10 +116,10 @@ class Game extends React.Component {
 		//this.audioHandler.recordAudio(this.audioRecorded.bind(this));//get audio permission from user with callback to send audio to
 		this.setState({ mainState: loggingInState});
 	}
-	login(){
+	login(name){
 		clearInterval(this.backgroundUpdateInterval);
 
-		let me = createPerson(this.socket.id,this.props.name);
+		let me = createPerson(this.socket.id,name);
 		this.socket.emit("create_character",me);
 		
 		this.updateGameInterval = setInterval(() => this.updateGame(), 50);
