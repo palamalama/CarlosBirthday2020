@@ -107,8 +107,8 @@ let data = {
 		},
 	}
 };
-function createPerson(id){
-	return {"name":id,"id":id,x:Math.random()*100,y:Math.random()*100,size:10,state:"alive"};
+function createPerson(id,name){
+	return {"name":name,"id":id,x:Math.random()*100,y:Math.random()*100,size:9,state:"alive"};
 }
 function getDistance(object1, object2){
 	let dx = object1.x - object2.x;
@@ -120,21 +120,24 @@ function getDistance(object1, object2){
 io.sockets.on('connection', function (socket) {
 	//ERIC STUFF
 	let id = socket.id;
-	data.people[id] = createPerson(id);
-	socket.emit("setup",{data:data,new_user_id:id});
 	console.log("Connected ",socket.handshake.address, data.people[id]);
 	
-	
+	socket.on("request_background_data",() => {
+		socket.emit("world_update", data); 
+	});
+	socket.on("create_character", (character) => {
+		data.people[id] = character;
+	});
 	socket.on("character_update",(updatedPerson) => {
 		data.people[id] = updatedPerson;
 		socket.emit('world_update', data);
 	});
 	socket.on("character_eaten",(eatenId) => {
 		console.log(eatenId,"just got eaten");
-		data.people[eatenId] = {"status": "deleted"};
+		delete data.people[eatenId];
+		socket.emit("world_update",data);
 		io.to(eatenId).emit("you_got_eaten");
 	});
-
 	//ERIC STUFF
 	console.log("New connection:", socket.id);
 	clientsLive++;
@@ -182,8 +185,12 @@ io.sockets.on('connection', function (socket) {
 	});
 });
 
-
+let counter = 0;
 setInterval(() => {
+	if(!data.people["-1"]){
+		data.people["-1"] = createPerson("-1","A realtime random boy "+(counter++));
+		console.log("Creating random boy");
+	}
 	data.people["-1"].x += Math.random()*2-1;
 	data.people["-1"].y += Math.random()*2-1;
 }, 50);

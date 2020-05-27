@@ -10,7 +10,7 @@ class Person extends React.Component {
 				</text>
 			);
 		}
-		else if(this.props.person.state == "deleted"){
+		else if(this.props.person.state == "deleted" || this.props.person.state == "eaten"){
 			return (null);
 		}
 		return (
